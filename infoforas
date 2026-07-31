@@ -1,0 +1,1394 @@
+You are the founding engineer responsible for building Crosscheck from an empty repository.
+
+Crosscheck is an independent verification runtime for AI-generated code.
+
+The central thesis is:
+
+The system writing code should not be the only system deciding whether that code is safe to ship.
+
+Crosscheck allows a developer to execute any coding agent or development command through a local CLI:
+
+    crosscheck run -- claude
+    crosscheck run -- codex
+    crosscheck run -- aider
+    crosscheck run -- <any command and arguments>
+
+Crosscheck records the repository before the command runs, executes the command transparently, captures the resulting repository changes, and independently verifies those changes through four isolated stages:
+
+    Scout
+    Builder
+    Reviewer
+    Judge
+
+The initial product is a local-first CLI and verification engine.
+
+Do NOT build a VS Code extension, web dashboard, GitHub App, billing system, or Claude-specific integration in this milestone.
+
+The CLI and verification engine must be designed so those integrations can call the same internal APIs later.
+
+==================================================
+1. PRODUCT BEHAVIOR
+==================================================
+
+The primary command is:
+
+    crosscheck run -- <command> [arguments...]
+
+Example:
+
+    crosscheck run -- claude -p "Add password reset support"
+
+Expected lifecycle:
+
+1. Validate that the current directory is a supported Git repository.
+2. Inspect the current repository state.
+3. Capture a baseline snapshot before executing the child command.
+4. Start a Crosscheck run.
+5. Execute the supplied command in an interactive subprocess.
+6. Preserve stdin, stdout, stderr, terminal colors, signals, and exit code behavior.
+7. Wait for the child command to finish.
+8. Capture the final repository state.
+9. Determine exactly what changed during the command.
+10. Build a structured verification context.
+11. Execute Scout.
+12. Execute Builder.
+13. Execute Reviewer.
+14. Execute Judge.
+15. Print a concise terminal verdict.
+16. Store the full evidence report locally.
+17. Exit using a documented Crosscheck exit code.
+
+Crosscheck must not require the wrapped command to know that Crosscheck exists.
+
+This must work:
+
+    crosscheck run -- bash
+    crosscheck run -- npm run generate
+    crosscheck run -- python script.py
+    crosscheck run -- claude
+    crosscheck run -- codex
+
+The double dash marks the end of Crosscheck options and the beginning of the wrapped command.
+
+Additional commands:
+
+    crosscheck verify
+    crosscheck report
+    crosscheck explain
+    crosscheck status
+    crosscheck init
+    crosscheck config
+    crosscheck version
+
+Behavior:
+
+    crosscheck verify
+
+Verifies the current uncommitted Git diff without executing another command.
+
+    crosscheck report
+
+Prints the most recent complete report.
+
+    crosscheck report <run-id>
+
+Prints a specific historical report.
+
+    crosscheck explain
+
+Explains the latest verdict in plain English.
+
+    crosscheck status
+
+Shows whether the current repository is configured, the latest run, provider status, and repository state.
+
+    crosscheck init
+
+Creates a `.crosscheck` directory and a readable configuration file.
+
+==================================================
+2. TECHNOLOGY
+==================================================
+
+Use:
+
+- TypeScript
+- Node.js 20 or newer
+- pnpm
+- ESM
+- strict TypeScript
+- a monorepo/workspace only if it provides clear value
+- Commander or an equivalently mature CLI parser
+- Zod for all external and inter-stage schemas
+- execa or Node child_process for subprocess management
+- simple-git or carefully wrapped Git subprocesses
+- Vitest for unit and integration tests
+- ESLint
+- Prettier
+- tsup or another straightforward TypeScript build tool
+
+Avoid unnecessary frameworks.
+
+The first version should run locally with:
+
+    pnpm install
+    pnpm build
+    pnpm test
+    pnpm dev -- run -- <command>
+
+The installed binary should be:
+
+    crosscheck
+
+Do not hard-code one LLM provider directly into business logic.
+
+Create a provider abstraction.
+
+Initially implement an Anthropic-compatible provider using environment variables, but make it easy to add OpenAI, local models, or other providers later.
+
+Expected environment configuration:
+
+    ANTHROPIC_API_KEY=
+    CROSSCHECK_MODEL_SCOUT=
+    CROSSCHECK_MODEL_REVIEWER=
+    CROSSCHECK_MODEL_JUDGE=
+
+Builder should not require an LLM for ordinary build/test execution.
+
+==================================================
+3. HIGH-LEVEL ARCHITECTURE
+==================================================
+
+Use clear domain boundaries.
+
+Suggested structure:
+
+    src/
+      cli/
+        commands/
+          run.ts
+          verify.ts
+          report.ts
+          explain.ts
+          status.ts
+          init.ts
+        output/
+        index.ts
+
+      core/
+        run/
+          run-orchestrator.ts
+          run-state.ts
+          run-context.ts
+        repository/
+          git-repository.ts
+          repository-snapshot.ts
+          diff-capture.ts
+          file-selection.ts
+        process/
+          command-runner.ts
+          signal-forwarding.ts
+        pipeline/
+          verification-pipeline.ts
+          stage.ts
+        policy/
+          policy-engine.ts
+          policy-schema.ts
+        reports/
+          report-builder.ts
+          report-store.ts
+          report-renderer.ts
+
+      stages/
+        scout/
+          scout-stage.ts
+          scout-prompt.ts
+          scout-schema.ts
+        builder/
+          builder-stage.ts
+          project-detector.ts
+          command-planner.ts
+          command-executor.ts
+          log-sanitizer.ts
+          builder-schema.ts
+        reviewer/
+          reviewer-stage.ts
+          reviewer-prompt.ts
+          reviewer-schema.ts
+          deterministic-rules/
+        judge/
+          judge-stage.ts
+          judge-prompt.ts
+          judge-schema.ts
+
+      providers/
+        llm-provider.ts
+        anthropic-provider.ts
+        provider-factory.ts
+
+      config/
+        config-loader.ts
+        config-schema.ts
+        defaults.ts
+
+      storage/
+        local-run-store.ts
+        paths.ts
+
+      shared/
+        errors.ts
+        logger.ts
+        schemas.ts
+        hashing.ts
+        redaction.ts
+        tokens.ts
+
+Do not follow this structure blindly if a cleaner implementation becomes obvious, but preserve the separation of concerns.
+
+==================================================
+4. LOCAL CROSSCHECK DIRECTORY
+==================================================
+
+`crosscheck init` should create:
+
+    .crosscheck/
+      config.json
+      policy.json
+      runs/
+      cache/
+      .gitignore
+
+The project should normally ignore generated run data.
+
+Suggested `.crosscheck/.gitignore`:
+
+    runs/
+    cache/
+
+Configuration example:
+
+    {
+      "version": 1,
+      "provider": "anthropic",
+      "models": {
+        "scout": "configured-through-environment",
+        "reviewer": "configured-through-environment",
+        "judge": "configured-through-environment"
+      },
+      "builder": {
+        "enabled": true,
+        "timeoutMs": 600000,
+        "maxLogBytes": 100000,
+        "installDependencies": false
+      },
+      "verification": {
+        "includeUntrackedFiles": true,
+        "maxDiffBytes": 500000,
+        "maxFileBytes": 150000
+      },
+      "privacy": {
+        "redactEnvironmentValues": true,
+        "excludePatterns": [
+          ".env",
+          ".env.*",
+          "**/*.pem",
+          "**/*.key",
+          "**/credentials.*"
+        ]
+      }
+    }
+
+Policy example:
+
+    {
+      "version": 1,
+      "mode": "advisory",
+      "blockAtSeverity": "high",
+      "minimumBlockingConfidence": 0.8,
+      "requireBuilderSuccess": false,
+      "allowOverride": true
+    }
+
+Supported policy modes:
+
+- shadow
+- advisory
+- blocking
+
+Definitions:
+
+shadow:
+    Record everything but always exit successfully.
+
+advisory:
+    Show failures but do not produce a blocking exit code.
+
+blocking:
+    Use the Judge result and policy thresholds to return a blocking exit code.
+
+==================================================
+5. RUN MODEL
+==================================================
+
+Every run must have a stable generated ID.
+
+Example:
+
+    ccr_01J...
+
+Persist a structured record containing:
+
+- run ID
+- repository path
+- repository remote if available
+- current branch
+- baseline commit SHA
+- start timestamp
+- finish timestamp
+- wrapped command
+- wrapped command exit code
+- repository dirty state before execution
+- repository dirty state after execution
+- baseline snapshot hash
+- final snapshot hash
+- changed files
+- diff
+- Scout output
+- Builder output
+- Reviewer output
+- Judge output
+- final policy decision
+- token usage where available
+- model/provider metadata
+- errors
+- evidence references
+
+Use JSON files initially.
+
+Do not require a database.
+
+Store runs under:
+
+    .crosscheck/runs/<run-id>/
+
+Example:
+
+    metadata.json
+    diff.patch
+    scout.json
+    builder.json
+    reviewer.json
+    judge.json
+    report.json
+    report.md
+    command.stdout.log
+    command.stderr.log
+
+Write files atomically where practical.
+
+A partial or failed verification must still leave a useful report.
+
+==================================================
+6. COMMAND EXECUTION
+==================================================
+
+`crosscheck run -- ...` must behave like a transparent wrapper.
+
+Requirements:
+
+- Spawn the command with inherited stdin.
+- Preserve interactive terminal behavior.
+- Forward SIGINT and SIGTERM correctly.
+- Preserve ANSI colors.
+- Capture output while still displaying it live when technically possible.
+- Record wrapped command exit code.
+- Avoid swallowing errors.
+- If the wrapped command exits non-zero, still run verification when repository changes exist.
+- Record whether the command failed.
+- Never print API keys or full environment values.
+- Do not upload environment files.
+- Do not mutate user code during verification.
+- Do not automatically revert the wrapped command's changes.
+
+The child process may itself be interactive.
+
+Design and test for this.
+
+==================================================
+7. REPOSITORY SNAPSHOTS AND DIFFS
+==================================================
+
+Crosscheck must distinguish:
+
+- changes that existed before the wrapped command
+- changes introduced during the wrapped command
+
+Before execution, record:
+
+- HEAD commit
+- staged diff
+- unstaged diff
+- untracked files
+- hashes of relevant working-tree files
+
+After execution, repeat the same process.
+
+Compute the delta attributable to the wrapped command.
+
+Do not falsely attribute pre-existing work to the wrapped command.
+
+For the first implementation, it is acceptable to represent this as:
+
+    final working tree changes
+    minus baseline working tree changes
+
+But the implementation must handle:
+
+- modified files
+- added files
+- deleted files
+- renamed files where Git detects them
+- binary files
+- untracked files
+- already-dirty repositories
+
+Never upload:
+
+- `.git`
+- `.crosscheck/runs`
+- dependency directories
+- build artifacts unless explicitly relevant
+- secrets or excluded files
+
+The report must clearly distinguish:
+
+    Pre-existing changes
+    Changes introduced by this run
+
+==================================================
+8. PIPELINE CONTRACT
+==================================================
+
+Every stage must:
+
+- have a typed input schema
+- have a typed output schema
+- validate output with Zod
+- receive a run context
+- produce structured evidence
+- record duration
+- record provider/model usage if applicable
+- fail safely
+- never return free-form text as its primary contract
+
+Create a shared stage interface similar to:
+
+    interface VerificationStage<TInput, TOutput> {
+      name: string;
+      execute(input: TInput, context: RunContext): Promise<TOutput>;
+    }
+
+The pipeline should execute stages in this order:
+
+    Scout
+    Builder
+    Reviewer
+    Judge
+    Policy Engine
+
+Do not allow the Judge to mutate preceding evidence.
+
+==================================================
+9. SCOUT
+==================================================
+
+Scout's responsibility is to understand the intended and actual scope of the change.
+
+Scout is not the final reviewer.
+
+Input should include:
+
+- wrapped command
+- repository metadata
+- changed file names
+- diff statistics
+- diff content, subject to limits
+- selected relevant project files
+- package manifests
+- repository README where available
+- optional user intent
+
+Scout should output structured JSON resembling:
+
+    {
+      "changeSummary": "Adds password reset endpoints and email token persistence.",
+      "apparentIntent": "Implement password reset support.",
+      "changeType": "feature",
+      "languages": ["TypeScript", "SQL"],
+      "frameworks": ["Next.js", "Supabase"],
+      "affectedAreas": [
+        "authentication",
+        "database",
+        "email"
+      ],
+      "riskLevel": "high",
+      "riskReasons": [
+        "Authentication logic changed",
+        "A database migration was added"
+      ],
+      "files": [
+        {
+          "path": "src/auth/reset.ts",
+          "role": "Password reset request handling",
+          "importance": "critical"
+        }
+      ],
+      "builderRecommendations": [
+        "Run unit tests",
+        "Run TypeScript compiler",
+        "Run migration validation"
+      ],
+      "reviewFocus": [
+        "Token expiry",
+        "Token reuse",
+        "Account enumeration",
+        "Secret handling"
+      ],
+      "uncertainties": []
+    }
+
+Allowed change types:
+
+- feature
+- bugfix
+- refactor
+- test
+- documentation
+- dependency
+- configuration
+- migration
+- mixed
+- unknown
+
+Allowed risk levels:
+
+- low
+- medium
+- high
+- critical
+
+Scout must cite file paths and diff evidence for its conclusions.
+
+Scout must not invent business requirements.
+
+When intent is unclear, explicitly record uncertainty.
+
+==================================================
+10. BUILDER
+==================================================
+
+Builder's responsibility is to produce runtime and tool evidence.
+
+Builder is not an LLM code reviewer.
+
+Builder should:
+
+1. Detect the project type.
+2. Identify package managers and manifests.
+3. Select safe verification commands.
+4. Execute commands with timeouts.
+5. Capture bounded logs.
+6. Sanitize secrets.
+7. Return structured results.
+
+Initially support:
+
+Node.js:
+- pnpm
+- npm
+- yarn
+- bun where safely detectable
+
+Common commands:
+- build
+- test
+- lint
+- typecheck
+
+Python:
+- pytest when clearly configured
+- compile/import validation where safe
+
+Generic:
+- explicitly configured commands from `.crosscheck/config.json`
+
+Never automatically run arbitrary scripts merely because they exist.
+
+Use a conservative allowlist.
+
+Do not install dependencies automatically by default.
+
+If dependencies are missing, report that rather than silently changing the repository.
+
+Builder output example:
+
+    {
+      "projectTypes": ["node"],
+      "packageManager": "pnpm",
+      "commands": [
+        {
+          "name": "typecheck",
+          "command": "pnpm typecheck",
+          "status": "passed",
+          "exitCode": 0,
+          "durationMs": 1834,
+          "stdoutTail": "...",
+          "stderrTail": ""
+        },
+        {
+          "name": "test",
+          "command": "pnpm test",
+          "status": "failed",
+          "exitCode": 1,
+          "durationMs": 5212,
+          "stdoutTail": "...",
+          "stderrTail": "Expected 401, received 200..."
+        }
+      ],
+      "overallStatus": "failed",
+      "evidence": [
+        {
+          "kind": "test-failure",
+          "summary": "Password reset token can be reused.",
+          "command": "pnpm test",
+          "reference": "builder-command-2"
+        }
+      ],
+      "limitations": []
+    }
+
+Statuses:
+
+- passed
+- failed
+- skipped
+- timed_out
+- unavailable
+- errored
+
+Builder output must distinguish:
+
+- no test command exists
+- command could not run
+- command ran and failed
+- command timed out
+- command passed
+
+Never treat "could not run" as "passed."
+
+==================================================
+11. DETERMINISTIC REVIEW RULES
+==================================================
+
+Before the LLM Reviewer, implement a small deterministic rule engine.
+
+This is not required to recreate every historical Crosscheck rule immediately.
+
+Create a clean extension interface:
+
+    interface DeterministicRule {
+      id: string;
+      title: string;
+      run(context: RuleContext): Promise<RuleFinding[]>;
+    }
+
+Initial rules should include practical checks such as:
+
+- likely secret added to diff
+- `.env` file introduced
+- dangerous `eval` or equivalent
+- shell execution with untrusted-looking input
+- disabled tests
+- focused/skipped tests
+- empty catch blocks
+- TODO/FIXME introduced in critical files
+- auth/payment files changed without tests
+- database migration added
+- dependency lockfile changed
+- suspicious permission broadening
+
+Each finding requires:
+
+- stable rule ID
+- title
+- severity
+- confidence
+- file
+- optional line
+- message
+- evidence excerpt
+- remediation
+
+Deterministic findings feed into Reviewer and Judge.
+
+Do not make weak regex matches blocking by default.
+
+==================================================
+12. REVIEWER
+==================================================
+
+Reviewer performs deep evidence-based analysis.
+
+Input:
+
+- Scout output
+- Builder evidence
+- deterministic findings
+- relevant changed files
+- diff
+- selected surrounding context
+- project metadata
+
+Reviewer must focus on:
+
+- correctness
+- security
+- authentication/authorization
+- data integrity
+- failure handling
+- concurrency
+- performance
+- API compatibility
+- unsafe assumptions
+- missing validation
+- missing tests
+- maintainability only where it creates meaningful risk
+
+Reviewer must avoid:
+
+- generic style commentary
+- personal preferences
+- vague "consider improving" remarks
+- duplicating compiler/linter output without adding value
+- inventing missing requirements
+- claiming certainty without evidence
+
+Every finding must include:
+
+    {
+      "id": "finding-generated-id",
+      "title": "Reset tokens can be reused",
+      "category": "security",
+      "severity": "high",
+      "confidence": 0.94,
+      "summary": "The token remains valid after a successful reset.",
+      "impact": "An intercepted token could be replayed.",
+      "evidence": [
+        {
+          "path": "src/auth/reset.ts",
+          "startLine": 82,
+          "endLine": 104,
+          "excerpt": "...",
+          "explanation": "The successful path updates the password but does not consume the token."
+        }
+      ],
+      "builderEvidenceRefs": [],
+      "recommendation": "Consume or invalidate the token atomically during password reset.",
+      "blockingCandidate": true
+    }
+
+Categories:
+
+- correctness
+- security
+- authorization
+- authentication
+- data-integrity
+- reliability
+- concurrency
+- performance
+- compatibility
+- testing
+- maintainability
+- dependency
+- configuration
+- privacy
+
+Severities:
+
+- info
+- low
+- medium
+- high
+- critical
+
+Reviewer output:
+
+    {
+      "summary": "...",
+      "findings": [],
+      "positiveEvidence": [],
+      "unresolvedQuestions": [],
+      "analysisLimitations": [],
+      "recommendedVerdict": "pass | warn | block"
+    }
+
+Reviewer recommendations do not directly determine the final verdict.
+
+==================================================
+13. JUDGE
+==================================================
+
+Judge is the final evidence aggregator.
+
+Judge receives:
+
+- Scout JSON
+- Builder JSON
+- deterministic findings
+- Reviewer JSON
+- policy configuration
+
+Judge should normally not receive the full repository again.
+
+It may receive small cited excerpts necessary to verify a disputed finding, but it should primarily judge existing structured evidence.
+
+Judge must answer:
+
+- Is there enough evidence to pass?
+- Are any findings credible and severe enough to block?
+- Did Builder produce a concrete failure?
+- Are findings speculative?
+- Does the configured policy make them blocking?
+- What exact evidence supports the verdict?
+
+Judge output:
+
+    {
+      "verdict": "pass | warn | block | inconclusive",
+      "confidence": 0.91,
+      "summary": "Block because the reset token remains reusable and the regression test fails.",
+      "reasons": [
+        {
+          "title": "Reusable password reset token",
+          "severity": "high",
+          "findingIds": ["..."],
+          "builderEvidenceRefs": ["builder-command-2"]
+        }
+      ],
+      "dismissedFindings": [
+        {
+          "findingId": "...",
+          "reason": "The claim is not sufficiently supported by the diff."
+        }
+      ],
+      "requiredActions": [
+        "Invalidate tokens atomically after use"
+      ],
+      "limitations": []
+    }
+
+The Judge should be skeptical of the Reviewer.
+
+It must be allowed to dismiss unsupported findings.
+
+Worst-result-wins should not be implemented naively.
+
+The Judge and policy engine must consider:
+
+- severity
+- confidence
+- concrete evidence
+- Builder failures
+- configured thresholds
+
+==================================================
+14. POLICY ENGINE
+==================================================
+
+The policy engine is deterministic.
+
+It consumes the Judge output and project policy.
+
+It produces:
+
+    {
+      "mode": "blocking",
+      "decision": "allow | warn | deny",
+      "exitCode": 0,
+      "reason": "...",
+      "overrideAvailable": true
+    }
+
+Suggested Crosscheck exit codes:
+
+- 0: allowed/pass
+- 1: internal Crosscheck error
+- 2: policy denied/block
+- 3: verification inconclusive
+- 4: invalid configuration
+- 5: wrapped command could not start
+
+In advisory and shadow mode, policy findings should normally not cause exit code 2.
+
+Document all exit codes.
+
+==================================================
+15. TERMINAL EXPERIENCE
+==================================================
+
+The terminal output should feel serious, compact, and useful.
+
+Example:
+
+    Crosscheck
+    Run ccr_01J...
+
+    Command
+      claude -p "Add password reset support"
+
+    Changes
+      7 files changed
+      +284 / -31
+
+    Scout
+      HIGH RISK
+      Authentication · Database · Email
+
+    Builder
+      ✓ Typecheck
+      ✗ Tests
+      ✓ Build
+
+    Reviewer
+      1 high · 2 medium · 1 low
+
+    Judge
+      BLOCK · 94% confidence
+
+    Reset tokens remain reusable after password changes.
+    Evidence: src/auth/reset.ts:82-104
+    Test: "rejects reuse of reset token" failed
+
+    Full report:
+      .crosscheck/runs/ccr_01J.../report.md
+
+Use symbols and colors when TTY supports them.
+
+Provide plain output when:
+
+    NO_COLOR=1
+
+or when stdout is not a TTY.
+
+Flags:
+
+    --json
+    --quiet
+    --verbose
+    --no-builder
+    --policy <path>
+    --intent <text>
+    --model-scout <model>
+    --model-reviewer <model>
+    --model-judge <model>
+
+`--json` must print machine-readable final output without decorative terminal text.
+
+==================================================
+16. REPORT
+==================================================
+
+Generate both JSON and Markdown reports.
+
+Markdown report sections:
+
+1. Overview
+2. Wrapped command
+3. Repository change summary
+4. Pre-existing changes
+5. Changes introduced by run
+6. Scout analysis
+7. Builder evidence
+8. Deterministic findings
+9. Reviewer findings
+10. Judge verdict
+11. Policy decision
+12. Limitations
+13. Model and token usage
+14. Run metadata
+
+Reports must cite exact file paths and line ranges where available.
+
+Do not expose secrets in reports.
+
+==================================================
+17. PROVIDER ABSTRACTION
+==================================================
+
+Create:
+
+    interface LlmProvider {
+      generateStructured<T>(
+        request: StructuredGenerationRequest<T>
+      ): Promise<StructuredGenerationResult<T>>;
+    }
+
+The request should include:
+
+- stage
+- system prompt
+- user content
+- response schema
+- model
+- max output tokens
+- temperature or equivalent
+- abort signal
+
+The result should include:
+
+- validated output
+- raw response metadata
+- input token usage if available
+- output token usage if available
+- duration
+- provider
+- model
+
+Use structured output where supported.
+
+Otherwise extract JSON carefully and validate it.
+
+On schema failure:
+
+1. Record the failure.
+2. Attempt one bounded repair request.
+3. If still invalid, fail that stage as inconclusive.
+4. Never silently coerce dangerous malformed output.
+
+==================================================
+18. CONTEXT SELECTION AND TOKEN CONTROL
+==================================================
+
+Do not send the entire repository blindly.
+
+Build a context selector.
+
+Always consider:
+
+- diff
+- changed files
+- package manifests
+- nearby code around changed lines
+- imported/local dependencies when reasonably resolvable
+- tests associated with changed modules
+- README/project configuration
+
+Exclude:
+
+- node_modules
+- vendor
+- dist/build
+- generated files
+- binary files
+- lockfiles from full LLM context unless dependency changes matter
+- secrets
+- oversized files unless a relevant slice can be selected
+
+Track estimated and actual token use.
+
+Implement hard context limits.
+
+If context is truncated, stages must report that limitation.
+
+==================================================
+19. PRIVACY AND SAFETY
+==================================================
+
+Crosscheck handles private source code.
+
+Requirements:
+
+- Never include environment variable values in prompts.
+- Redact likely secrets from diffs and logs.
+- Exclude configured sensitive paths.
+- Print a clear local warning before the first remote-model run.
+- Add configuration for provider disablement/offline mode.
+- Never execute code suggested by an LLM.
+- Builder commands come only from deterministic detection/configuration.
+- Never let Scout/Reviewer dynamically invent shell commands that are executed without deterministic approval.
+- Prevent path traversal in local report storage.
+- Bound logs, diffs, outputs, and timeouts.
+- Do not follow symlinks outside the repository when collecting context.
+- Never mutate source files during verification stages.
+
+==================================================
+20. ERROR HANDLING
+==================================================
+
+Handle:
+
+- not inside Git repository
+- unborn repository/no commits
+- detached HEAD
+- dirty working tree
+- no changes produced
+- wrapped command missing
+- wrapped command spawn failure
+- wrapped command non-zero exit
+- command interrupted
+- API key missing
+- model timeout
+- invalid model output
+- Builder timeout
+- oversized diff
+- binary-only changes
+- excluded sensitive file changes
+- report storage failure
+- malformed config
+
+Crosscheck must give a useful message and preserve as much evidence as possible.
+
+If no changes were produced:
+
+    Crosscheck: no repository changes detected.
+
+Do not spend model tokens unless explicitly requested.
+
+==================================================
+21. TESTS
+==================================================
+
+Write meaningful tests from the beginning.
+
+Unit tests:
+
+- configuration parsing
+- policy evaluation
+- snapshot comparison
+- diff filtering
+- sensitive-path exclusion
+- redaction
+- context selection
+- stage schema validation
+- exit-code mapping
+- deterministic rules
+- report rendering
+
+Integration tests:
+
+- `crosscheck run -- node script-that-edits-a-file.js`
+- pre-existing dirty file is not attributed to wrapped command
+- wrapped command adds a file
+- wrapped command deletes a file
+- wrapped command exits non-zero after changing code
+- no-change command avoids LLM calls
+- malformed provider output
+- Builder timeout
+- advisory vs blocking mode
+- JSON output
+- signal forwarding where reasonably testable
+
+Use fake providers for tests.
+
+Do not require real API calls in the default test suite.
+
+Create fixture repositories in temporary directories.
+
+==================================================
+22. OBSERVABILITY
+==================================================
+
+Each stage records:
+
+- startedAt
+- completedAt
+- durationMs
+- status
+- model/provider
+- token usage
+- error
+- input context summary
+
+Verbose mode may show stage progress.
+
+Never print hidden prompts, full source code, or secrets unless an explicit unsafe debug flag is later introduced. Do not add such a flag now.
+
+==================================================
+23. DOCUMENTATION
+==================================================
+
+Create:
+
+- README.md
+- docs/architecture.md
+- docs/pipeline.md
+- docs/security.md
+- docs/configuration.md
+- docs/exit-codes.md
+- CONTRIBUTING.md
+
+README must show:
+
+    pnpm install
+    pnpm build
+    export ANTHROPIC_API_KEY=...
+    crosscheck init
+    crosscheck run -- claude
+    crosscheck verify
+    crosscheck report
+
+Include a diagram:
+
+    Wrapped command
+          ↓
+    Repository delta
+          ↓
+       Scout
+          ↓
+       Builder
+          ↓
+      Reviewer
+          ↓
+       Judge
+          ↓
+    Policy decision
+          ↓
+    Terminal + report
+
+Explain honestly that this is an early verification system, not a guarantee of correctness or security.
+
+==================================================
+24. IMPLEMENTATION ORDER
+==================================================
+
+Build this incrementally.
+
+Milestone 1:
+- repository scaffolding
+- CLI
+- `crosscheck init`
+- config loading
+- run storage
+- transparent command execution
+- before/after snapshot
+- attributable diff
+- no LLM yet
+
+Milestone 2:
+- stage abstraction
+- fake provider
+- Scout schemas
+- Scout implementation
+- terminal progress
+- reports
+
+Milestone 3:
+- Builder detection
+- build/test/lint/typecheck execution
+- bounded sanitized logs
+- Builder evidence
+
+Milestone 4:
+- deterministic rule engine
+- initial rules
+- Reviewer schemas
+- Reviewer implementation
+
+Milestone 5:
+- Judge
+- policy engine
+- verdicts
+- exit codes
+
+Milestone 6:
+- Anthropic provider
+- token accounting
+- structured output repair
+- complete reports
+
+Milestone 7:
+- integration tests
+- security hardening
+- docs
+- package binary
+
+Do not jump to later integrations.
+
+==================================================
+25. DEFINITION OF DONE
+==================================================
+
+The initial Crosscheck release is done when this works:
+
+1. Start in a fixture repository.
+2. Run:
+
+       crosscheck run -- node modify-repository.js
+
+3. The child command runs normally.
+4. Crosscheck correctly identifies only the changes introduced by that command.
+5. Scout returns valid structured scope/risk.
+6. Builder detects and executes relevant safe project checks.
+7. Deterministic rules produce evidence.
+8. Reviewer returns evidence-linked findings.
+9. Judge produces a supported verdict.
+10. Policy engine returns the proper decision and exit code.
+11. Terminal output is useful.
+12. Full JSON and Markdown reports exist.
+13. Secrets and excluded paths were not sent or printed.
+14. Unit and integration tests pass.
+15. `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm build` pass.
+
+==================================================
+26. ENGINEERING RULES
+==================================================
+
+- Do not leave placeholder implementations disguised as complete.
+- Do not use `any` unless an external boundary makes it unavoidable and it is narrowed immediately.
+- Validate every external boundary.
+- Prefer small explicit modules.
+- Avoid giant manager classes.
+- Use dependency injection where it improves testing, not everywhere.
+- Keep domain logic independent from CLI presentation.
+- No network calls in unit tests.
+- Never execute LLM-produced shell commands.
+- Never upload secrets.
+- Never claim a stage passed when it did not execute.
+- Never hide limitations.
+- Every verdict must trace back to evidence.
+- Every finding must cite evidence.
+- The Judge must be able to dismiss Reviewer findings.
+- Keep the initial implementation understandable by one founder.
+
+==================================================
+27. HOW TO WORK
+==================================================
+
+Begin by:
+
+1. Inspecting the empty/current repository.
+2. Writing an implementation plan to `PLAN.md`.
+3. Creating the project scaffold.
+4. Implementing Milestone 1 completely.
+5. Running tests, lint, typecheck, and build.
+6. Fixing failures.
+7. Committing or clearly reporting Milestone 1 status.
+8. Proceeding milestone by milestone.
+
+At the end of each milestone:
+
+- summarize what was added
+- list files created/changed
+- run lint
+- run typecheck
+- run tests
+- run build
+- state what remains
+- do not claim success unless commands actually pass
+
+Do not ask me broad product questions unless a genuinely blocking ambiguity exists.
+
+Choose sensible defaults and document them.
+
+Start now.
