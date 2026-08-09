@@ -12,6 +12,12 @@ import { loadConfig, loadPolicy } from '../../config/config-loader.js';
 import { CommandSpawnError } from '../../shared/errors.js';
 import { logger } from '../../shared/logger.js';
 import { recordRun } from '../memory/memory-engine.js';
+import { getOrCreateFingerprint } from '../repository/repo-fingerprint.js';
+import { VerificationCache } from '../cache/verification-cache.js';
+import { selectContext } from '../context/context-selector.js';
+import { createProgress } from '../../cli/output/progress.js';
+import { printVerificationSeparator } from '../../cli/output/terminal.js';
+import { pruneOldRuns } from './run-pruner.js';
 import type { RunFlags } from './run-context.js';
 import type { RunContext } from './run-context.js';
 
@@ -25,6 +31,7 @@ export interface OrchestratorResult {
   runId: string;
   exitCode: number;
   repoRoot: string;
+  pipeline?: import('../pipeline/verification-pipeline.js').PipelineResult;
 }
 
 export async function orchestrateRun(
@@ -35,7 +42,10 @@ export async function orchestrateRun(
   const repoInfo = await getRepositoryInfo(cwd);
   const repoRoot = repoInfo.root;
 
-  const config = await loadConfig(repoRoot);
+  const [config, fingerprint] = await Promise.all([
+    loadConfig(repoRoot),
+    getOrCreateFingerprint(repoRoot, repoInfo.remote),
+  ]);
   const policy = flags.policyPath
     ? await loadPolicy(flags.policyPath)
     : await loadPolicy(repoRoot);
@@ -50,6 +60,7 @@ export async function orchestrateRun(
     runId,
     repositoryPath: repoRoot,
     repositoryRemote: repoInfo.remote,
+    repoId: fingerprint.repoId,
     branch: repoInfo.branch,
     baselineCommitSha: repoInfo.commitSha,
     wrappedCommand,
@@ -65,6 +76,12 @@ export async function orchestrateRun(
     commandResult = await runCommand(wrappedCommand, cwd, repoRoot, runId, abortController.signal);
   } catch (err) {
     throw new CommandSpawnError(`Failed to spawn command: ${String(err)}`);
+  }
+
+  // Print a clear separator so users can tell where the agent output ended
+  // and Crosscheck verification begins. Skip in quiet/JSON mode.
+  if (!flags.quiet && !flags.json) {
+    printVerificationSeparator();
   }
 
   const finalSnapshot = await captureSnapshot(repoRoot, config.verification.maxFileBytes);
@@ -89,11 +106,40 @@ export async function orchestrateRun(
     return { runId, exitCode: commandResult.exitCode, repoRoot };
   }
 
+  const cache = new VerificationCache(repoRoot);
+
+  // Select context once here — stages read from context.selectedContext
+  // instead of the raw diff, giving consistent token budgeting and redaction.
+  const selectedContext = await selectContext({
+    repoRoot,
+    diff,
+    maxDiffBytes: config.verification.maxDiffBytes,
+    maxFileBytes: config.verification.maxFileBytes,
+    maxTotalTokens: 60_000,
+    excludePatterns: config.privacy.excludePatterns,
+  });
+
+  if (selectedContext.limitations.length) {
+    logger.debug(`Context selector limitations: ${selectedContext.limitations.join('; ')}`);
+  }
+
   const context: RunContext = {
-    runId, repoRoot, config, policy,
-    wrappedCommand, intent: flags.intent,
-    baselineSnapshot: baseline, finalSnapshot, diff,
-    record, flags, abortSignal: abortController.signal,
+    runId,
+    repoRoot,
+    repoId: fingerprint.repoId,
+    config,
+    policy,
+    wrappedCommand,
+    intent: flags.intent,
+    baselineSnapshot: baseline,
+    finalSnapshot,
+    diff,
+    selectedContext,
+    record,
+    flags,
+    cache,
+    progress: createProgress(flags.quiet || flags.json),
+    abortSignal: abortController.signal,
   };
 
   const pipelineResult = await runVerificationPipeline(context);
@@ -110,6 +156,11 @@ export async function orchestrateRun(
   };
   await saveRunJson(repoRoot, runId, 'metadata.json', finalRecord);
 
+  // Prune old runs after writing — non-fatal, run silently.
+  pruneOldRuns(repoRoot, config.runsToKeep).catch((err) =>
+    logger.debug(`Run pruning failed (non-fatal): ${String(err)}`),
+  );
+
   const exitCode = pipelineResult.policy?.exitCode ?? commandResult.exitCode;
-  return { runId, exitCode, repoRoot };
+  return { runId, exitCode, repoRoot, pipeline: pipelineResult };
 }

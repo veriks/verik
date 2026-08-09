@@ -2,10 +2,8 @@ import type { RunContext } from '../run/run-context.js';
 import type { PipelineResult } from '../pipeline/verification-pipeline.js';
 import { saveRunJson, saveRunFile } from '../../storage/local-run-store.js';
 import { renderReport } from './report-renderer.js';
-import {
-  createEvidenceStore,
-  addEvidence,
-} from './evidence-store.js';
+import { renderHtmlReport } from './report-renderer-html.js';
+import { createEvidenceStore, addEvidence } from './evidence-store.js';
 
 export async function buildAndSaveReport(
   context: RunContext,
@@ -13,10 +11,8 @@ export async function buildAndSaveReport(
 ): Promise<void> {
   const { repoRoot, runId } = context;
 
-  // Build evidence store — findings reference stable IDs
   const evidence = createEvidenceStore();
 
-  // Index builder command evidence
   if (pipeline.builder) {
     for (const cmd of pipeline.builder.commands) {
       if (cmd.status !== 'passed' && cmd.status !== 'skipped') {
@@ -29,7 +25,6 @@ export async function buildAndSaveReport(
     }
   }
 
-  // Index diff excerpt as evidence
   if (context.diff?.patch) {
     addEvidence(evidence, {
       kind: 'diff-excerpt',
@@ -44,6 +39,7 @@ export async function buildAndSaveReport(
     intent: context.intent,
     repository: {
       path: context.repoRoot,
+      repoId: context.repoId,
       branch: context.record.branch,
       baselineCommit: context.record.baselineCommitSha,
     },
@@ -56,10 +52,10 @@ export async function buildAndSaveReport(
       truncated: context.diff?.truncated ?? false,
     },
     stages: {
-      scout: { status: pipeline.stageStatuses.scout, output: pipeline.scout },
-      builder: { status: pipeline.stageStatuses.builder, output: pipeline.builder },
-      reviewer: { status: pipeline.stageStatuses.reviewer, output: pipeline.reviewer },
-      judge: { status: pipeline.stageStatuses.judge, output: pipeline.judge },
+      scout:    stageRecord(pipeline, 'scout'),
+      builder:  stageRecord(pipeline, 'builder'),
+      reviewer: stageRecord(pipeline, 'reviewer'),
+      judge:    stageRecord(pipeline, 'judge'),
     },
     evidence: evidence.items,
     policy: pipeline.policy,
@@ -70,10 +66,23 @@ export async function buildAndSaveReport(
   await saveRunJson(repoRoot, runId, 'evidence.json', evidence.items);
 
   const md = renderReport(context, pipeline);
+  const html = renderHtmlReport(context, pipeline);
   await saveRunFile(repoRoot, runId, 'report.md', md);
+  await saveRunFile(repoRoot, runId, 'report.html', html);
 
-  if (pipeline.scout) await saveRunJson(repoRoot, runId, 'scout.json', { status: pipeline.stageStatuses.scout, output: pipeline.scout });
-  if (pipeline.builder) await saveRunJson(repoRoot, runId, 'builder.json', { status: pipeline.stageStatuses.builder, output: pipeline.builder });
-  if (pipeline.reviewer) await saveRunJson(repoRoot, runId, 'reviewer.json', { status: pipeline.stageStatuses.reviewer, output: pipeline.reviewer });
-  if (pipeline.judge) await saveRunJson(repoRoot, runId, 'judge.json', { status: pipeline.stageStatuses.judge, output: pipeline.judge });
+  // Individual stage files carry both output and full inference metadata —
+  // model, provider, promptVersion, promptHash, inputHash, token usage, duration.
+  // crosscheck inspect reads these directly.
+  const sm = pipeline.stageMetadata;
+  if (pipeline.scout)    await saveRunJson(repoRoot, runId, 'scout.json',    { ...sm.scout,    output: pipeline.scout });
+  if (pipeline.builder)  await saveRunJson(repoRoot, runId, 'builder.json',  { ...sm.builder,  output: pipeline.builder });
+  if (pipeline.reviewer) await saveRunJson(repoRoot, runId, 'reviewer.json', { ...sm.reviewer, output: pipeline.reviewer });
+  if (pipeline.judge)    await saveRunJson(repoRoot, runId, 'judge.json',    { ...sm.judge,    output: pipeline.judge });
+}
+
+function stageRecord(pipeline: PipelineResult, stage: 'scout' | 'builder' | 'reviewer' | 'judge') {
+  return {
+    ...(pipeline.stageMetadata[stage] ?? {}),
+    output: pipeline[stage],
+  };
 }

@@ -8,7 +8,7 @@ export function createProvider(config: CrosscheckConfig): LlmProvider {
     return new FakeProvider();
   }
   if (config.provider === 'anthropic') {
-    return new AnthropicProvider();
+    return new AnthropicProvider(process.env['ANTHROPIC_API_KEY']);
   }
   return new FakeProvider();
 }

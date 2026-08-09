@@ -2,10 +2,14 @@ import type { CrosscheckConfig, PolicyConfig } from '../../config/config-schema.
 import type { RepositorySnapshot } from '../repository/repository-snapshot.js';
 import type { DiffResult } from '../repository/diff-capture.js';
 import type { RunRecord } from './run-state.js';
+import type { VerificationCache } from '../cache/verification-cache.js';
+import type { SelectedContext } from '../context/context-selector.js';
+import type { StageProgress } from '../../cli/output/progress.js';
 
 export interface RunContext {
   runId: string;
   repoRoot: string;
+  repoId: string;
   config: CrosscheckConfig;
   policy: PolicyConfig;
   wrappedCommand: string[];
@@ -13,8 +17,11 @@ export interface RunContext {
   baselineSnapshot: RepositorySnapshot;
   finalSnapshot?: RepositorySnapshot;
   diff?: DiffResult;
+  selectedContext?: SelectedContext;
   record: RunRecord;
   flags: RunFlags;
+  cache: VerificationCache;
+  progress: StageProgress;
   abortSignal: AbortSignal;
 }
 

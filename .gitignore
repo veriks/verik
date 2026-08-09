@@ -1,5 +1,7 @@
 node_modules/
 dist/
+dist-bin/
+releases/
 .crosscheck/runs/
 .crosscheck/cache/
 *.log

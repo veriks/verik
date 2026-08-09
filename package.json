@@ -3,20 +3,36 @@
   "version": "0.1.0",
   "description": "Independent verification runtime for AI-generated code",
   "type": "module",
-  "engines": {
-    "node": ">=20"
-  },
+  "engines": { "node": ">=20" },
   "bin": {
-    "crosscheck": "./dist/cli/index.js"
+    "crosscheck": "./dist/index.js"
   },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
-    "build": "tsup",
-    "dev": "tsx src/cli/index.ts",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "lint": "eslint src --ext .ts",
-    "typecheck": "tsc --noEmit",
-    "format": "prettier --write \"src/**/*.ts\""
+    "build":        "tsup",
+    "build:bin":    "tsup --config tsup.binary.config.ts && node scripts/pkg-build.mjs",
+    "prepare":      "npm run build",
+    "dev":          "tsx src/cli/index.ts",
+    "test":         "vitest run",
+    "test:watch":   "vitest",
+    "lint":         "eslint src --ext .ts",
+    "typecheck":    "tsc --noEmit",
+    "format":       "prettier --write \"src/**/*.ts\""
+  },
+  "pkg": {
+    "scripts": "dist-bin/index.cjs",
+    "assets": [],
+    "targets": [
+      "node20-linux-x64",
+      "node20-linux-arm64",
+      "node20-macos-x64",
+      "node20-macos-arm64",
+      "node20-win-x64"
+    ],
+    "outputPath": "releases"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.0",
@@ -28,17 +44,25 @@
     "nanoid": "^5.0.7",
     "ora": "^8.1.1",
     "simple-git": "^3.27.0",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
     "@types/node": "^20.16.10",
     "@typescript-eslint/eslint-plugin": "^8.7.0",
     "@typescript-eslint/parser": "^8.7.0",
+    "@yao-pkg/pkg": "^6.22.0",
     "eslint": "^9.11.1",
     "prettier": "^3.3.3",
     "tsup": "^8.3.0",
     "tsx": "^4.19.1",
     "typescript": "^5.6.2",
     "vitest": "^2.1.1"
+  },
+  "keywords": ["ai", "code-review", "verification", "claude", "coding-agent", "security"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eamonn/crosscheck"
   }
 }
