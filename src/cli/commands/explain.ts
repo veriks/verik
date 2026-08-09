@@ -21,16 +21,42 @@ export function buildExplainCommand(): Command {
             return;
           }
         }
+
         const judgePath = runFilePath(info.root, id, 'judge.json');
         try {
           const raw = await readFile(judgePath, 'utf8');
-          const judge = JSON.parse(raw) as JudgeOutput;
+          const parsed = JSON.parse(raw) as { output?: JudgeOutput } | JudgeOutput;
+
+          // Stage files are saved as { ...metadata, output: JudgeOutput }.
+          // Handle both that shape and the legacy bare JudgeOutput.
+          const judge: JudgeOutput | undefined =
+            parsed && typeof parsed === 'object' && 'output' in parsed && parsed.output
+              ? parsed.output
+              : (parsed as JudgeOutput);
+
+          if (!judge?.verdict) {
+            console.log(`Run ${id} has no verdict yet — verification may not have completed.`);
+            return;
+          }
+
           console.log(`Verdict: ${judge.verdict.toUpperCase()} (${Math.round(judge.confidence * 100)}% confidence)`);
           console.log('');
           console.log(judge.summary);
+
+          if (judge.reasons.length) {
+            console.log('\nReasons:');
+            for (const r of judge.reasons) {
+              console.log(`  [${r.severity.toUpperCase()}] ${r.title}`);
+            }
+          }
+
           if (judge.requiredActions.length) {
             console.log('\nRequired actions:');
             for (const a of judge.requiredActions) console.log(`  - ${a}`);
+          }
+
+          if (judge.dismissedFindings.length) {
+            console.log(`\n${judge.dismissedFindings.length} finding(s) dismissed as unsupported.`);
           }
         } catch {
           console.log(`No judge output found for run ${id}.`);

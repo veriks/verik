@@ -26,6 +26,7 @@ export type StageRunStatus = z.infer<typeof StageRunStatusSchema>;
 
 export interface RunRecord {
   runId: string;
+  repoId: string;
   repositoryPath: string;
   repositoryRemote?: string;
   branch: string;
@@ -51,6 +52,7 @@ export interface RunRecord {
 
 export function createRunRecord(params: {
   runId: string;
+  repoId: string;
   repositoryPath: string;
   repositoryRemote?: string;
   branch: string;
@@ -61,6 +63,7 @@ export function createRunRecord(params: {
 }): RunRecord {
   return {
     runId: params.runId,
+    repoId: params.repoId,
     repositoryPath: params.repositoryPath,
     repositoryRemote: params.repositoryRemote,
     branch: params.branch,

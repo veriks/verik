@@ -1,6 +1,5 @@
 import { spawn } from 'node:child_process';
 import { createWriteStream } from 'node:fs';
-import { join } from 'node:path';
 import { runFilePath } from '../../storage/paths.js';
 import { logger } from '../../shared/logger.js';
 
@@ -41,30 +40,38 @@ export async function runCommand(
   child.stderr?.pipe(process.stderr, { end: false });
   child.stderr?.pipe(stderrStream);
 
-  const forwardSignal = (sig: NodeJS.Signals) => {
-    logger.debug(`Forwarding signal ${sig} to child process`);
-    child.kill(sig);
-  };
+  // Named handlers so they can be removed after the child exits.
+  // Anonymous lambdas passed to process.on() cannot be removed and accumulate
+  // across multiple runs in the same process (e.g. tests).
+  const onSigint  = () => { logger.debug('Forwarding SIGINT');  child.kill('SIGINT');  };
+  const onSigterm = () => { logger.debug('Forwarding SIGTERM'); child.kill('SIGTERM'); };
+  const onAbort   = () => child.kill('SIGTERM');
 
-  process.on('SIGINT', () => forwardSignal('SIGINT'));
-  process.on('SIGTERM', () => forwardSignal('SIGTERM'));
+  process.on('SIGINT',  onSigint);
+  process.on('SIGTERM', onSigterm);
 
   if (abortSignal.aborted) {
     child.kill('SIGTERM');
   } else {
-    abortSignal.addEventListener('abort', () => child.kill('SIGTERM'));
+    abortSignal.addEventListener('abort', onAbort);
   }
+
+  const cleanup = () => {
+    process.off('SIGINT',  onSigint);
+    process.off('SIGTERM', onSigterm);
+    abortSignal.removeEventListener('abort', onAbort);
+    stdoutStream.close();
+    stderrStream.close();
+  };
 
   return new Promise((resolve, reject) => {
     child.on('error', (err) => {
-      stdoutStream.close();
-      stderrStream.close();
+      cleanup();
       reject(err);
     });
 
     child.on('close', (code, signal) => {
-      stdoutStream.close();
-      stderrStream.close();
+      cleanup();
       resolve({
         exitCode: code ?? 1,
         signalName: signal ?? undefined,

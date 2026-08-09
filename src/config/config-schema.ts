@@ -37,6 +37,8 @@ export const CrosscheckConfigSchema = z.object({
   builder: BuilderConfigSchema.default({}),
   verification: VerificationConfigSchema.default({}),
   privacy: PrivacyConfigSchema.default({}),
+  inferenceTimeoutMs: z.number().default(120_000),  // 2 minutes per LLM call
+  runsToKeep: z.number().default(100),              // prune older runs automatically
 });
 
 export type CrosscheckConfig = z.infer<typeof CrosscheckConfigSchema>;
