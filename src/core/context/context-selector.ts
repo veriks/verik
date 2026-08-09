@@ -7,10 +7,13 @@ import { sliceFile } from './file-slicer.js';
 import { createBudget, consumeBudget } from './context-budget.js';
 import type { ContextBudget } from './context-budget.js';
 import { redactSecrets } from '../../shared/redaction.js';
+import { narrowSafePatch } from '../privacy/diff-sanitizer.js';
+import type { SafePatch } from '../privacy/patch-types.js';
 import { logger } from '../../shared/logger.js';
 
 export interface SelectedContext {
-  diff: string;
+  /** Model-facing, so this is the sanitised patch by type, not by convention. */
+  diff: SafePatch;
   changedFiles: ContextFile[];
   manifestFiles: ContextFile[];
   readmeExcerpt?: string;
@@ -46,12 +49,28 @@ export async function selectContext(opts: ContextSelectorOptions): Promise<Selec
   const limitations: string[] = [];
   let budget = createBudget(maxTotalTokens);
 
-  // Diff always goes first
-  const patchResult = consumeBudget(budget, diff.patch);
-  const patchForContext = patchResult.text;
+  // Diff always goes first. `safePatch`, never `patch` — the raw one would not
+  // type-check against SelectedContext.diff, which is the point.
+  const patchResult = consumeBudget(budget, diff.safePatch);
+  const patchForContext = narrowSafePatch(diff.safePatch, patchResult.text);
   budget = patchResult.budget;
   if (budget.truncated) {
     limitations.push('Diff was truncated to fit token budget.');
+  }
+
+  // Tell the model what it is not being shown, so absence of a finding in a
+  // withheld file is not mistaken for evidence of its safety.
+  if (diff.excludedFiles.length) {
+    limitations.push(
+      `${diff.excludedFiles.length} file(s) withheld by privacy policy: ` +
+        [...new Set(diff.excludedFiles.map((f) => f.path))].join(', '),
+    );
+  }
+  if (diff.redactionCount > 0) {
+    limitations.push(`${diff.redactionCount} line(s) contained redacted secrets.`);
+  }
+  if (diff.droppedFiles.length) {
+    limitations.push(`${diff.droppedFiles.length} file(s) omitted: diff exceeded size limit.`);
   }
 
   // Changed files (excluding binary, lockfiles, secrets)

@@ -1,7 +1,7 @@
 import { mkdtemp, mkdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { simpleGit, type SimpleGit } from 'simple-git';
+import { join, resolve } from 'node:path';
+import { execa } from 'execa';
 import { logger } from '../../shared/logger.js';
 
 /**
@@ -22,6 +22,11 @@ import { logger } from '../../shared/logger.js';
  *   GIT_OPTIONAL_LOCKS=0              never take index.lock in the user's repo
  *
  * No stash, no `git add` against the real index, no checkout, no refs.
+ *
+ * git is invoked directly rather than through simple-git: every argv here is a
+ * compile-time constant, and simple-git's unsafe-operation guard rejects the
+ * very hardening flags below (`core.pager`, `diff.external`) because it cannot
+ * distinguish our constants from attacker-supplied values.
  */
 
 /** Neutralises user git config that could corrupt machine-read output. */
@@ -41,6 +46,9 @@ const HARDENED = [
 /** Crosscheck's own run artifacts must never be attributed to the wrapped command. */
 const EXCLUDE_PATHSPECS = [':(exclude,glob).crosscheck/**', ':(exclude).crosscheck'];
 
+/** Diffs of large repositories comfortably exceed execa's default buffer. */
+const MAX_GIT_OUTPUT_BYTES = 256 * 1024 * 1024;
+
 export interface TreeWorkspace {
   /** Temp directory holding the run-scoped index files and object store. */
   dir: string;
@@ -52,15 +60,66 @@ export interface TreeWorkspace {
 }
 
 /**
+ * The ambient environment minus the entire GIT_* namespace.
+ *
+ * Inherited git variables are actively hostile here. GIT_DIR, GIT_WORK_TREE and
+ * GIT_INDEX_FILE are all set when crosscheck runs inside a git hook, and would
+ * retarget our plumbing at the hook's repository and index instead of ours. We
+ * set every variable that matters below, so nothing of value is lost.
+ */
+function inheritedEnv(): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value === undefined || key.startsWith('GIT_')) continue;
+    env[key] = value;
+  }
+  return env;
+}
+
+function scopedEnv(ws: TreeWorkspace, indexLabel: string): Record<string, string> {
+  return {
+    ...inheritedEnv(),
+    GIT_INDEX_FILE: join(ws.dir, `${indexLabel}.index`),
+    GIT_OBJECT_DIRECTORY: ws.objectDir,
+    GIT_ALTERNATE_OBJECT_DIRECTORIES: ws.repoObjectDir,
+    GIT_OPTIONAL_LOCKS: '0',
+    GIT_TERMINAL_PROMPT: '0',
+  };
+}
+
+async function git(cwd: string, env: Record<string, string>, args: string[]): Promise<string> {
+  const { stdout } = await execa('git', args, {
+    cwd,
+    env,
+    extendEnv: false,
+    // Patches are content — a stripped trailing newline changes the bytes.
+    stripFinalNewline: false,
+    maxBuffer: MAX_GIT_OUTPUT_BYTES,
+  });
+  return stdout;
+}
+
+/** Workspace-scoped git: temp index, temp object store, real objects readable. */
+function scoped(
+  root: string,
+  ws: TreeWorkspace,
+  indexLabel: string,
+): (args: string[]) => Promise<string> {
+  const env = scopedEnv(ws, indexLabel);
+  return (args) => git(root, env, args);
+}
+
+/**
  * One workspace per run. The baseline tree is written here before the wrapped
  * command runs and read back afterwards, so this must not be disposed until the
  * whole run is over.
  */
 export async function createTreeWorkspace(root: string): Promise<TreeWorkspace> {
-  const git = simpleGit(root);
   // `--git-path` rather than join(root, '.git', 'objects'): under linked
-  // worktrees and submodules `.git` is a file, not a directory.
-  const repoObjectDir = (await git.raw(['rev-parse', '--git-path', 'objects'])).trim();
+  // worktrees and submodules `.git` is a file, not a directory. Resolved to an
+  // absolute path because alternates are read relative to the child's cwd.
+  const raw = (await git(root, inheritedEnv(), ['rev-parse', '--git-path', 'objects'])).trim();
+  const repoObjectDir = resolve(root, raw);
 
   const dir = await mkdtemp(join(tmpdir(), 'crosscheck-tree-'));
   const objectDir = join(dir, 'objects');
@@ -76,16 +135,6 @@ export async function createTreeWorkspace(root: string): Promise<TreeWorkspace> 
   };
 }
 
-function scopedGit(root: string, ws: TreeWorkspace, indexLabel: string): SimpleGit {
-  return simpleGit(root).env({
-    ...process.env,
-    GIT_INDEX_FILE: join(ws.dir, `${indexLabel}.index`),
-    GIT_OBJECT_DIRECTORY: ws.objectDir,
-    GIT_ALTERNATE_OBJECT_DIRECTORIES: ws.repoObjectDir,
-    GIT_OPTIONAL_LOCKS: '0',
-  });
-}
-
 /**
  * Materialises the entire working tree (tracked, staged, untracked; gitignored
  * files excluded by git itself) into a temp index, then writes it as a tree.
@@ -98,22 +147,44 @@ export async function buildWorktreeTree(
   root: string,
   ws: TreeWorkspace,
   label: string,
+  includeUntracked = true,
 ): Promise<string> {
-  const git = scopedGit(root, ws, label);
+  const run = scoped(root, ws, label);
 
   // Seed the temp index from HEAD. An unborn HEAD has no commit to read.
   try {
-    await git.raw(['read-tree', 'HEAD']);
+    await run(['read-tree', 'HEAD']);
   } catch {
-    await git.raw(['read-tree', '--empty']);
+    await run(['read-tree', '--empty']);
   }
 
-  // -A stages modifications, additions and deletions, tracked and untracked.
-  // Never --force: that would pull gitignored files in, and asymmetric use
-  // would fabricate deletions.
-  await git.raw(['add', '-A', '--ignore-errors', '--', '.', ...EXCLUDE_PATHSPECS]);
+  // -A stages modifications, additions and deletions, tracked and untracked;
+  // -u restricts that to already-tracked paths. Whichever is chosen must be
+  // used for *both* trees — an asymmetric build fabricates changes.
+  //
+  // Never --force: that would pull gitignored files in.
+  const mode = includeUntracked ? '-A' : '-u';
+  await run(['add', mode, '--ignore-errors', '--', '.', ...EXCLUDE_PATHSPECS]);
 
-  return (await git.raw(['write-tree'])).trim();
+  return (await run(['write-tree'])).trim();
+}
+
+/**
+ * The tree HEAD points at — the committed state, for separating pre-existing
+ * dirt from what the wrapped command did.
+ *
+ * An unborn HEAD yields the empty tree. It is written through `write-tree`
+ * rather than hardcoding 4b825dc… so the oid matches the repository's hash
+ * algorithm (SHA-256 repositories have a different empty-tree oid).
+ */
+export async function readHeadTree(root: string, ws: TreeWorkspace): Promise<string> {
+  const run = scoped(root, ws, 'head');
+  try {
+    return (await run(['rev-parse', 'HEAD^{tree}'])).trim();
+  } catch {
+    await run(['read-tree', '--empty']);
+    return (await run(['write-tree'])).trim();
+  }
 }
 
 export interface TreeDiffFile {
@@ -207,13 +278,13 @@ export async function diffTrees(
     return { patch: '', files: [], additions: 0, deletions: 0 };
   }
 
-  const git = scopedGit(root, ws, 'diff');
+  const run = scoped(root, ws, 'diff');
   const common = ['diff', '--no-color', '--no-ext-diff', '--no-textconv', '--find-renames'];
 
   const [patch, nameStatus, numstat] = await Promise.all([
-    git.raw([...HARDENED, ...common, '--unified=3', fromTree, toTree]),
-    git.raw([...HARDENED, ...common, '--name-status', '-z', fromTree, toTree]),
-    git.raw([...HARDENED, ...common, '--numstat', '-z', fromTree, toTree]),
+    run([...HARDENED, ...common, '--unified=3', fromTree, toTree]),
+    run([...HARDENED, ...common, '--name-status', '-z', fromTree, toTree]),
+    run([...HARDENED, ...common, '--numstat', '-z', fromTree, toTree]),
   ]);
 
   const files = parseNameStatus(nameStatus);
@@ -236,16 +307,11 @@ export async function preExistingPaths(
 ): Promise<string[]> {
   if (headTree === baselineTree) return [];
   try {
-    const git = scopedGit(root, ws, 'pre');
-    const out = await git.raw([
-      ...HARDENED,
-      'diff',
-      '--name-only',
-      '-z',
-      '--no-color',
-      headTree,
-      baselineTree,
-    ]);
+    const out = await scoped(
+      root,
+      ws,
+      'pre',
+    )([...HARDENED, 'diff', '--name-only', '-z', '--no-color', headTree, baselineTree]);
     return out.split('\0').filter((p) => p.length > 0);
   } catch (err) {
     logger.debug(`Could not compute pre-existing paths: ${String(err)}`);

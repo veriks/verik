@@ -3,6 +3,7 @@ import { mkdir } from 'node:fs/promises';
 import { getRepositoryInfo } from '../repository/git-repository.js';
 import { captureSnapshot } from '../repository/repository-snapshot.js';
 import { computeDiff } from '../repository/diff-capture.js';
+import { createTreeWorkspace } from '../repository/worktree-tree.js';
 import { runCommand } from '../execution/command-runner.js';
 import { runVerificationPipeline } from '../pipeline/verification-pipeline.js';
 import { createRunRecord, finalizeRunRecord } from './run-state.js';
@@ -54,113 +55,146 @@ export async function orchestrateRun(
   await ensureRunDir(repoRoot, runId);
   await mkdir(runDir(repoRoot, runId), { recursive: true });
 
-  const baseline = await captureSnapshot(repoRoot, config.verification.maxFileBytes);
+  // The baseline tree is written before the wrapped command and read back after
+  // it, so the workspace has to span the whole run — and be disposed on every
+  // exit path, including a throw out of the command itself.
+  const workspace = await createTreeWorkspace(repoRoot);
 
-  let record = createRunRecord({
-    runId,
-    repositoryPath: repoRoot,
-    repositoryRemote: repoInfo.remote,
-    repoId: fingerprint.repoId,
-    branch: repoInfo.branch,
-    baselineCommitSha: repoInfo.commitSha,
-    wrappedCommand,
-    baselineSnapshot: baseline,
-    repositoryDirtyBefore: repoInfo.isDirty,
-  });
-
-  await saveRunJson(repoRoot, runId, 'metadata.json', record);
-
-  const abortController = new AbortController();
-  let commandResult;
   try {
-    commandResult = await runCommand(wrappedCommand, cwd, repoRoot, runId, abortController.signal);
-  } catch (err) {
-    throw new CommandSpawnError(`Failed to spawn command: ${String(err)}`);
-  }
+    const baseline = await captureSnapshot(
+      repoRoot,
+      workspace,
+      'baseline',
+      config.verification.includeUntrackedFiles,
+    );
 
-  // Print a clear separator so users can tell where the agent output ended
-  // and Crosscheck verification begins. Skip in quiet/JSON mode.
-  if (!flags.quiet && !flags.json) {
-    printVerificationSeparator();
-  }
+    let record = createRunRecord({
+      runId,
+      repositoryPath: repoRoot,
+      repositoryRemote: repoInfo.remote,
+      repoId: fingerprint.repoId,
+      branch: repoInfo.branch,
+      baselineCommitSha: repoInfo.commitSha,
+      wrappedCommand,
+      baselineSnapshot: baseline,
+      repositoryDirtyBefore: repoInfo.isDirty,
+    });
 
-  const finalSnapshot = await captureSnapshot(repoRoot, config.verification.maxFileBytes);
-  const diff = await computeDiff(
-    repoRoot, baseline, config.verification.maxDiffBytes, config.verification.includeUntrackedFiles,
-  );
+    await saveRunJson(repoRoot, runId, 'metadata.json', record);
 
-  record = finalizeRunRecord(record, {
-    wrappedCommandExitCode: commandResult.exitCode,
-    finalSnapshot,
-    diff,
-    repositoryDirtyAfter: !!(finalSnapshot.trackedChangedFiles.length || finalSnapshot.untrackedFiles.length),
-  });
+    const abortController = new AbortController();
+    let commandResult;
+    try {
+      commandResult = await runCommand(wrappedCommand, cwd, repoRoot, runId, abortController.signal);
+    } catch (err) {
+      throw new CommandSpawnError(`Failed to spawn command: ${String(err)}`);
+    }
 
-  await saveRunJson(repoRoot, runId, 'metadata.json', record);
-  await saveRunFile(repoRoot, runId, 'diff.patch', diff.patch);
+    // Print a clear separator so users can tell where the agent output ended
+    // and Crosscheck verification begins. Skip in quiet/JSON mode.
+    if (!flags.quiet && !flags.json) {
+      printVerificationSeparator();
+    }
 
-  if (diff.changedFiles.length === 0 && !flags.verbose) {
-    logger.info('Crosscheck: no repository changes detected.');
-    const finalRecord = { ...record, status: 'completed' as const };
+    const finalSnapshot = await captureSnapshot(
+      repoRoot,
+      workspace,
+      'final',
+      config.verification.includeUntrackedFiles,
+    );
+    const diff = await computeDiff({
+      root: repoRoot,
+      workspace,
+      baseline,
+      final: finalSnapshot,
+      maxDiffBytes: config.verification.maxDiffBytes,
+      excludePatterns: config.privacy.excludePatterns,
+    });
+
+    record = finalizeRunRecord(record, {
+      wrappedCommandExitCode: commandResult.exitCode,
+      finalSnapshot,
+      diff,
+      repositoryDirtyAfter: finalSnapshot.dirty,
+    });
+
+    await saveRunJson(repoRoot, runId, 'metadata.json', record);
+    // Raw, deliberately: `.crosscheck/runs/` is gitignored and local, and a
+    // redacted forensic artifact is worse than useless when triaging a leak.
+    await saveRunFile(repoRoot, runId, 'diff.patch', diff.patch);
+
+    if (diff.changedFiles.length === 0 && !flags.verbose) {
+      logger.info('Crosscheck: no repository changes detected.');
+      const finalRecord = { ...record, status: 'completed' as const };
+      await saveRunJson(repoRoot, runId, 'metadata.json', finalRecord);
+      return { runId, exitCode: commandResult.exitCode, repoRoot };
+    }
+
+    if (diff.excludedFiles.length) {
+      logger.debug(
+        `Withheld ${diff.excludedFiles.length} file(s) from the model by privacy policy: ` +
+          diff.excludedFiles.map((f) => f.path).join(', '),
+      );
+    }
+
+    const cache = new VerificationCache(repoRoot);
+
+    // Select context once here — stages read from context.selectedContext
+    // instead of the raw diff, giving consistent token budgeting and redaction.
+    const selectedContext = await selectContext({
+      repoRoot,
+      diff,
+      maxDiffBytes: config.verification.maxDiffBytes,
+      maxFileBytes: config.verification.maxFileBytes,
+      maxTotalTokens: 60_000,
+      excludePatterns: config.privacy.excludePatterns,
+    });
+
+    if (selectedContext.limitations.length) {
+      logger.debug(`Context selector limitations: ${selectedContext.limitations.join('; ')}`);
+    }
+
+    const context: RunContext = {
+      runId,
+      repoRoot,
+      repoId: fingerprint.repoId,
+      config,
+      policy,
+      wrappedCommand,
+      intent: flags.intent,
+      baselineSnapshot: baseline,
+      finalSnapshot,
+      diff,
+      selectedContext,
+      record,
+      flags,
+      cache,
+      progress: createProgress(flags.quiet || flags.json),
+      abortSignal: abortController.signal,
+    };
+
+    const pipelineResult = await runVerificationPipeline(context);
+
+    const { buildAndSaveReport } = await import('../../core/reports/report-builder.js');
+    await buildAndSaveReport(context, pipelineResult);
+    await recordRun(context, pipelineResult);
+
+    const finalRecord = {
+      ...record,
+      status: 'completed' as const,
+      stageStatuses: pipelineResult.stageStatuses,
+      errors: pipelineResult.errors,
+    };
     await saveRunJson(repoRoot, runId, 'metadata.json', finalRecord);
-    return { runId, exitCode: commandResult.exitCode, repoRoot };
+
+    // Prune old runs after writing — non-fatal, run silently.
+    pruneOldRuns(repoRoot, config.runsToKeep).catch((err) =>
+      logger.debug(`Run pruning failed (non-fatal): ${String(err)}`),
+    );
+
+    const exitCode = pipelineResult.policy?.exitCode ?? commandResult.exitCode;
+    return { runId, exitCode, repoRoot, pipeline: pipelineResult };
+  } finally {
+    await workspace.dispose();
   }
-
-  const cache = new VerificationCache(repoRoot);
-
-  // Select context once here — stages read from context.selectedContext
-  // instead of the raw diff, giving consistent token budgeting and redaction.
-  const selectedContext = await selectContext({
-    repoRoot,
-    diff,
-    maxDiffBytes: config.verification.maxDiffBytes,
-    maxFileBytes: config.verification.maxFileBytes,
-    maxTotalTokens: 60_000,
-    excludePatterns: config.privacy.excludePatterns,
-  });
-
-  if (selectedContext.limitations.length) {
-    logger.debug(`Context selector limitations: ${selectedContext.limitations.join('; ')}`);
-  }
-
-  const context: RunContext = {
-    runId,
-    repoRoot,
-    repoId: fingerprint.repoId,
-    config,
-    policy,
-    wrappedCommand,
-    intent: flags.intent,
-    baselineSnapshot: baseline,
-    finalSnapshot,
-    diff,
-    selectedContext,
-    record,
-    flags,
-    cache,
-    progress: createProgress(flags.quiet || flags.json),
-    abortSignal: abortController.signal,
-  };
-
-  const pipelineResult = await runVerificationPipeline(context);
-
-  const { buildAndSaveReport } = await import('../../core/reports/report-builder.js');
-  await buildAndSaveReport(context, pipelineResult);
-  await recordRun(context, pipelineResult);
-
-  const finalRecord = {
-    ...record,
-    status: 'completed' as const,
-    stageStatuses: pipelineResult.stageStatuses,
-    errors: pipelineResult.errors,
-  };
-  await saveRunJson(repoRoot, runId, 'metadata.json', finalRecord);
-
-  // Prune old runs after writing — non-fatal, run silently.
-  pruneOldRuns(repoRoot, config.runsToKeep).catch((err) =>
-    logger.debug(`Run pruning failed (non-fatal): ${String(err)}`),
-  );
-
-  const exitCode = pipelineResult.policy?.exitCode ?? commandResult.exitCode;
-  return { runId, exitCode, repoRoot, pipeline: pipelineResult };
 }

@@ -3,9 +3,43 @@ import type { RunContext } from '../../core/run/run-context.js';
 import type { RunRecord } from '../../core/run/run-state.js';
 import { CrosscheckConfigSchema, PolicyConfigSchema } from '../../config/config-schema.js';
 import { VerificationCache } from '../../core/cache/verification-cache.js';
+import { asRawPatch } from '../../core/privacy/patch-types.js';
+import { prepareSafePatch } from '../../core/privacy/diff-sanitizer.js';
 import { createProgress } from './progress.js';
 
 const FAKE_RUN_ID = 'ccr_DEMO0000000000000001';
+
+const FAKE_TREE = 'd0000000000000000000000000000000000demo0';
+
+const FAKE_PATCH = asRawPatch(`diff --git a/src/auth/reset.ts b/src/auth/reset.ts
+new file mode 100644
+--- /dev/null
++++ b/src/auth/reset.ts
+@@ -0,0 +1,110 @@
++import crypto from 'node:crypto'
++import bcrypt from 'bcrypt'
++import { db } from '../db/client.js'
++
++export async function requestReset(email: string) {
++  const user = await db.users.findByEmail(email)
++  if (!user) return res.status(404).json({ error: 'Email not found' })
++  const token = crypto.randomBytes(32).toString('hex')
++  const expiresAt = new Date(Date.now() + 3600_000)
++  await db.reset_tokens.create({ userId: user.id, token, expiresAt })
++  await sendResetEmail(user.email, token)
++}
++
++export async function confirmReset(token: string, newPassword: string) {
++  const record = await db.reset_tokens.findByToken(token)
++  if (!record || record.expiresAt < new Date()) throw new Error('Invalid token')
++  const hashed = await bcrypt.hash(newPassword, 12)
++  await db.users.update({ id: record.userId, password: hashed })
++  // token not deleted or marked used
++}`);
+
+// Through the real sanitiser rather than a hand-written constant, so the demo
+// shows what a user would actually see.
+const FAKE_SAFE = prepareSafePatch(FAKE_PATCH, [], 500_000);
 
 export function buildFakeRecord(): RunRecord {
   return {
@@ -276,38 +310,16 @@ export function buildFakeContext(record: RunRecord): RunContext {
       capturedAt: record.startedAt,
       commitSha: record.baselineCommitSha,
       branch: record.branch,
-      stagedDiff: '',
-      unstagedDiff: '',
-      untrackedFiles: [],
-      trackedChangedFiles: [],
+      tree: FAKE_TREE,
+      headTree: FAKE_TREE,
+      dirty: false,
       hash: record.baselineSnapshotHash,
     },
     diff: {
-      patch: `diff --git a/src/auth/reset.ts b/src/auth/reset.ts
-new file mode 100644
---- /dev/null
-+++ b/src/auth/reset.ts
-@@ -0,0 +1,110 @@
-+import crypto from 'node:crypto'
-+import bcrypt from 'bcrypt'
-+import { db } from '../db/client.js'
-+
-+export async function requestReset(email: string) {
-+  const user = await db.users.findByEmail(email)
-+  if (!user) return res.status(404).json({ error: 'Email not found' })
-+  const token = crypto.randomBytes(32).toString('hex')
-+  const expiresAt = new Date(Date.now() + 3600_000)
-+  await db.reset_tokens.create({ userId: user.id, token, expiresAt })
-+  await sendResetEmail(user.email, token)
-+}
-+
-+export async function confirmReset(token: string, newPassword: string) {
-+  const record = await db.reset_tokens.findByToken(token)
-+  if (!record || record.expiresAt < new Date()) throw new Error('Invalid token')
-+  const hashed = await bcrypt.hash(newPassword, 12)
-+  await db.users.update({ id: record.userId, password: hashed })
-+  // token not deleted or marked used
-+}`,
+      patch: FAKE_PATCH,
+      safePatch: FAKE_SAFE.patch,
+      excludedFiles: FAKE_SAFE.excludedFiles,
+      redactionCount: FAKE_SAFE.redactionCount,
       changedFiles: record.changedFiles!.map((p) => ({
         path: p,
         changeType: 'added' as const,
@@ -320,6 +332,7 @@ new file mode 100644
       preExistingChangedPaths: [],
       commandIntroducedPaths: record.commandIntroducedPaths!,
       truncated: false,
+      droppedFiles: [],
     },
     record,
     flags: {
@@ -329,7 +342,7 @@ new file mode 100644
       noBuilder: false,
     },
     selectedContext: {
-      diff: '',
+      diff: FAKE_SAFE.patch,
       changedFiles: [],
       manifestFiles: [],
       tokenBudget: { totalTokens: 60_000, usedTokens: 0, remainingTokens: 60_000, truncated: false },

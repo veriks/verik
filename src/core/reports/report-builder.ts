@@ -4,6 +4,7 @@ import { saveRunJson, saveRunFile } from '../../storage/local-run-store.js';
 import { renderReport } from './report-renderer.js';
 import { renderHtmlReport } from './report-renderer-html.js';
 import { createEvidenceStore, addEvidence } from './evidence-store.js';
+import { redactCommandLine } from '../../shared/redaction.js';
 
 export async function buildAndSaveReport(
   context: RunContext,
@@ -25,17 +26,18 @@ export async function buildAndSaveReport(
     }
   }
 
-  if (context.diff?.patch) {
+  // Reports get attached to CI runs and pasted into issues — sanitised, not raw.
+  if (context.diff?.safePatch) {
     addEvidence(evidence, {
       kind: 'diff-excerpt',
-      excerpt: context.diff.patch.slice(0, 2000),
+      excerpt: context.diff.safePatch.slice(0, 2000),
     });
   }
 
   const report = {
     runId,
     generatedAt: new Date().toISOString(),
-    wrappedCommand: context.wrappedCommand,
+    wrappedCommand: redactCommandLine(context.wrappedCommand),
     intent: context.intent,
     repository: {
       path: context.repoRoot,

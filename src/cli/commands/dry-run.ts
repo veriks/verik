@@ -1,8 +1,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { getRepositoryInfo } from '../../core/repository/git-repository.js';
-import { captureSnapshot } from '../../core/repository/repository-snapshot.js';
-import { computeDiff } from '../../core/repository/diff-capture.js';
+import { computeWorktreeDiff } from '../../core/repository/diff-capture.js';
 import { loadConfig, loadPolicy } from '../../config/config-loader.js';
 import { getOrCreateFingerprint } from '../../core/repository/repo-fingerprint.js';
 import { selectContext } from '../../core/context/context-selector.js';
@@ -48,13 +47,12 @@ export function buildDryRunCommand(): Command {
         console.log();
 
         // Current diff (what would be attributed to the command if run now)
-        const snapshot = await captureSnapshot(root, config.verification.maxFileBytes);
-        const diff = await computeDiff(
+        const { diff } = await computeWorktreeDiff({
           root,
-          snapshot,
-          config.verification.maxDiffBytes,
-          config.verification.includeUntrackedFiles,
-        );
+          maxDiffBytes: config.verification.maxDiffBytes,
+          excludePatterns: config.privacy.excludePatterns,
+          includeUntracked: config.verification.includeUntrackedFiles,
+        });
 
         if (diff.changedFiles.length > 0) {
           console.log(
