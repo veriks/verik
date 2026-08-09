@@ -5,10 +5,14 @@ export const BuilderConfigSchema = z.object({
   timeoutMs: z.number().default(600_000),
   maxLogBytes: z.number().default(100_000),
   installDependencies: z.boolean().default(false),
-  commands: z.array(z.object({
-    name: z.string(),
-    command: z.string(),
-  })).optional(),
+  commands: z
+    .array(
+      z.object({
+        name: z.string(),
+        command: z.string(),
+      }),
+    )
+    .optional(),
 });
 
 export const VerificationConfigSchema = z.object({
@@ -19,15 +23,15 @@ export const VerificationConfigSchema = z.object({
 
 export const PrivacyConfigSchema = z.object({
   redactEnvironmentValues: z.boolean().default(true),
-  excludePatterns: z.array(z.string()).default([
-    '.env', '.env.*', '**/*.pem', '**/*.key', '**/credentials.*',
-  ]),
+  excludePatterns: z
+    .array(z.string())
+    .default(['.env', '.env.*', '**/*.pem', '**/*.key', '**/credentials.*']),
 });
 
 export const ModelsConfigSchema = z.object({
-  scout: z.string().default('configured-through-environment'),
-  reviewer: z.string().default('configured-through-environment'),
-  judge: z.string().default('configured-through-environment'),
+  scout: z.string().default('claude-haiku-4-5'),
+  reviewer: z.string().default('claude-sonnet-5'),
+  judge: z.string().default('claude-opus-5'),
 });
 
 export const CrosscheckConfigSchema = z.object({
@@ -37,8 +41,8 @@ export const CrosscheckConfigSchema = z.object({
   builder: BuilderConfigSchema.default({}),
   verification: VerificationConfigSchema.default({}),
   privacy: PrivacyConfigSchema.default({}),
-  inferenceTimeoutMs: z.number().default(120_000),  // 2 minutes per LLM call
-  runsToKeep: z.number().default(100),              // prune older runs automatically
+  inferenceTimeoutMs: z.number().default(120_000), // 2 minutes per LLM call
+  runsToKeep: z.number().default(100), // prune older runs automatically
 });
 
 export type CrosscheckConfig = z.infer<typeof CrosscheckConfigSchema>;

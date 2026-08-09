@@ -54,7 +54,7 @@ jobs:
 
             **curl (macOS / Linux)**
             ```sh
-            curl -fsSL https://raw.githubusercontent.com/eamonn/crosscheck/main/scripts/install.sh | sh
+            curl -fsSL https://raw.githubusercontent.com/crosscheck-sh/crosscheck/main/scripts/install.sh | sh
             ```
 
             **Direct download**

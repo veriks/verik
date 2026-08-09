@@ -141,9 +141,9 @@ scripts/
   "version": 1,
   "provider": "anthropic",
   "models": {
-    "scout":    "configured-through-environment",
-    "reviewer": "configured-through-environment",
-    "judge":    "configured-through-environment"
+    "scout":    "claude-haiku-4-5",
+    "reviewer": "claude-sonnet-5",
+    "judge":    "claude-opus-5"
   },
   "builder": {
     "enabled": true,
@@ -195,6 +195,10 @@ CROSSCHECK_MODEL_SCOUT
 CROSSCHECK_MODEL_REVIEWER
 CROSSCHECK_MODEL_JUDGE
 ```
+
+Model resolution precedence: `CROSSCHECK_MODEL_<STAGE>` → `config.json` → per-stage
+default in `src/config/defaults.ts`. Stages are tiered by how much capability each
+needs: Scout triages (Haiku), Reviewer analyses (Sonnet), Judge decides (Opus).
 
 ---
 

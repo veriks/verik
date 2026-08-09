@@ -74,7 +74,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/eamonn/crosscheck"
+    "url": "https://github.com/crosscheck-sh/crosscheck"
   },
   "packageManager": "pnpm@9.12.0"
 }
