@@ -1,5 +1,5 @@
 import { readFile, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { resolveInsideRepo } from '../../shared/paths-safe.js';
 
 export interface FileSlice {
   path: string;
@@ -16,7 +16,11 @@ export async function sliceFile(
   aroundLine?: number,
   contextLines = 40,
 ): Promise<FileSlice | null> {
-  const fullPath = join(root, filePath);
+  // A committed symlink can point outside the repository; reading through it
+  // would ship unrelated files to the LLM.
+  const fullPath = await resolveInsideRepo(root, filePath);
+  if (!fullPath) return null;
+
   try {
     const info = await stat(fullPath);
     if (info.size === 0) return null;

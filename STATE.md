@@ -8,6 +8,9 @@ This document is written for someone picking the project up cold, with their own
 Claude. Everything below was verified by running it, not recalled. Where something
 is unverified, it says so — please keep that property.
 
+For the commercial side — the free/paid boundary, distribution, licence position
+— see [docs/product-strategy.md](docs/product-strategy.md).
+
 ---
 
 ## 1. What it is
