@@ -10,6 +10,7 @@ export default defineConfig({
   outDir: 'dist-bin',
   clean: true,
   sourcemap: false,
+  minify: true,
   splitting: false,
   bundle: true,
   shims: true,   // ESM shims for __dirname, __filename, import.meta, etc.
