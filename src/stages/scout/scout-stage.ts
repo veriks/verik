@@ -1,6 +1,8 @@
-import type { VerificationStage } from '../../core/pipeline/stage.js';
+import type { VerificationStage, StageOutputWithMeta } from '../../core/pipeline/stage.js';
 import type { RunContext } from '../../core/run/run-context.js';
 import type { ScoutOutput } from './scout-schema.js';
+
+export const SCOUT_PROMPT_VERSION = '0.1.0';
 
 export interface ScoutInput {
   context: RunContext;
@@ -9,12 +11,12 @@ export interface ScoutInput {
 export class ScoutStage implements VerificationStage<ScoutInput, ScoutOutput> {
   name = 'Scout';
 
-  async execute(input: ScoutInput, _context: RunContext): Promise<ScoutOutput> {
+  async execute(input: ScoutInput, _context: RunContext): Promise<StageOutputWithMeta<ScoutOutput>> {
     const { context } = input;
     const { diff } = context;
 
     if (!diff) {
-      return this.emptyOutput('No diff available');
+      return { output: this.emptyOutput('No diff available') };
     }
 
     const provider = await this.getProvider(context);
@@ -30,10 +32,21 @@ export class ScoutStage implements VerificationStage<ScoutInput, ScoutOutput> {
       model: context.flags.modelScout ?? context.config.models.scout,
       maxOutputTokens: 4096,
       temperature: 0.1,
+      promptVersion: SCOUT_PROMPT_VERSION,
+      timeoutMs: context.config.inferenceTimeoutMs,
       abortSignal: context.abortSignal,
     });
 
-    return result.output;
+    return {
+      output: result.output,
+      meta: {
+        model: result.model,
+        provider: result.provider,
+        promptVersion: SCOUT_PROMPT_VERSION,
+        promptHash: result.promptHash,
+        inputHash: result.inputHash,
+      },
+    };
   }
 
   private async getProvider(context: RunContext) {

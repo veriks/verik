@@ -1,0 +1,37 @@
+name: Crosscheck
+
+on:
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  crosscheck:
+    runs-on: ubuntu-latest
+    name: Verify AI changes
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Crosscheck
+        run: npm install -g crosscheck
+        # Or pin a version: npm install -g crosscheck@0.1.0
+
+      - name: Initialize
+        run: crosscheck init
+
+      - name: Verify changes
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          crosscheck verify \
+            --intent "PR: ${{ github.event.pull_request.title }}"
+        # Exit codes:
+        #   0 — pass / advisory mode (default)
+        #   2 — block (blocking policy mode only)
+        #   3 — inconclusive

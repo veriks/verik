@@ -1,7 +1,12 @@
 import { Command } from 'commander';
 import { orchestrateRun } from '../../core/run/run-orchestrator.js';
 import { getRepositoryInfo } from '../../core/repository/git-repository.js';
-import { printHeader, printCommand, printChanges, printVerdictSummary, printError, printJson, printNoChanges } from '../output/terminal.js';
+import {
+  printCommand,
+  printVerdictSummary,
+  printError,
+  printJson,
+} from '../output/terminal.js';
 import { setVerbose } from '../../shared/logger.js';
 import { CrosscheckError } from '../../shared/errors.js';
 import type { RunFlags } from '../../core/run/run-context.js';
@@ -15,7 +20,7 @@ export function buildRunCommand(): Command {
     .option('--verbose', 'Enable verbose logging')
     .option('--no-builder', 'Skip Builder stage')
     .option('--policy <path>', 'Path to policy.json')
-    .option('--intent <text>', 'User intent description')
+    .option('--intent <text>', 'User intent description for better Scout analysis')
     .option('--model-scout <model>', 'Model override for Scout stage')
     .option('--model-reviewer <model>', 'Model override for Reviewer stage')
     .option('--model-judge <model>', 'Model override for Judge stage')
@@ -46,7 +51,14 @@ export function buildRunCommand(): Command {
         const result = await orchestrateRun(commandArgs, cwd, flags);
 
         if (flags.json) {
-          printJson({ runId: result.runId, exitCode: result.exitCode });
+          printJson({
+            runId: result.runId,
+            exitCode: result.exitCode,
+            verdict: result.pipeline?.judge?.verdict,
+            confidence: result.pipeline?.judge?.confidence,
+          });
+        } else if (!flags.quiet && result.pipeline) {
+          printVerdictSummary(result.pipeline, result, flags.intent);
         }
 
         process.exit(result.exitCode);

@@ -28,6 +28,25 @@ export function printCommand(command: string[]): void {
   }
 }
 
+/**
+ * Separator printed after the wrapped command exits and before verification
+ * begins. Gives a clear visual break so users know where the agent output ends
+ * and Crosscheck output begins.
+ */
+export function printVerificationSeparator(): void {
+  const c = isColorEnabled();
+  const cols = process.stdout.columns ?? 72;
+  const label = ' Crosscheck verification ';
+  const lineLen = Math.max(0, Math.floor((cols - label.length) / 2));
+  const line = '─'.repeat(lineLen);
+  const separator = `\n${line}${label}${line}`;
+  if (c) {
+    console.log(chalk.dim(separator) + '\n');
+  } else {
+    console.log(separator + '\n');
+  }
+}
+
 export function printChanges(additions: number, deletions: number, fileCount: number): void {
   const c = isColorEnabled();
   if (c) {
@@ -40,7 +59,11 @@ export function printChanges(additions: number, deletions: number, fileCount: nu
   }
 }
 
-export function printVerdictSummary(pipeline: PipelineResult, result: OrchestratorResult): void {
+export function printVerdictSummary(
+  pipeline: PipelineResult,
+  result: OrchestratorResult,
+  intent?: string,
+): void {
   const c = isColorEnabled();
   const { scout, builder, reviewer, judge, policy } = pipeline;
 
@@ -71,10 +94,10 @@ export function printVerdictSummary(pipeline: PipelineResult, result: Orchestrat
 
   if (reviewer) {
     const high = reviewer.findings.filter((f) => f.severity === 'high' || f.severity === 'critical').length;
-    const med = reviewer.findings.filter((f) => f.severity === 'medium').length;
-    const low = reviewer.findings.filter((f) => f.severity === 'low' || f.severity === 'info').length;
+    const med  = reviewer.findings.filter((f) => f.severity === 'medium').length;
+    const low  = reviewer.findings.filter((f) => f.severity === 'low' || f.severity === 'info').length;
     if (c) console.log(chalk.bold('Reviewer')); else console.log('Reviewer');
-    console.log(`  ${high > 0 ? chalk.red(high + ' high') : '0 high'} · ${med} medium · ${low} low`);
+    console.log(`  ${high > 0 ? (c ? chalk.red(high + ' high') : high + ' high') : '0 high'} · ${med} medium · ${low} low`);
     console.log();
   }
 
@@ -100,6 +123,16 @@ export function printVerdictSummary(pipeline: PipelineResult, result: Orchestrat
   const reportPath = join(runDir(result.repoRoot, result.runId), 'report.md');
   console.log('Full report:');
   console.log('  ' + (c ? chalk.underline(reportPath) : reportPath));
+
+  // Nudge: if Scout found HIGH/CRITICAL risk and no intent was provided,
+  // remind the user that --intent improves analysis quality.
+  if (scout && !intent && (scout.riskLevel === 'high' || scout.riskLevel === 'critical')) {
+    console.log();
+    const tip = `Tip: re-run with --intent "what this change was meant to do" for more accurate analysis.`;
+    if (c) console.log(chalk.dim('  ' + tip));
+    else console.log('  ' + tip);
+  }
+
   console.log();
 }
 

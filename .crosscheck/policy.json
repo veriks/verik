@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "mode": "advisory",
+  "blockAtSeverity": "high",
+  "minimumBlockingConfidence": 0.8,
+  "requireBuilderSuccess": false,
+  "allowOverride": true
+}
