@@ -12,6 +12,7 @@ import { buildRunsCommand } from './commands/runs.js';
 import { buildOverrideCommand } from './commands/override.js';
 import { buildDoctorCommand } from './commands/doctor.js';
 import { buildDryRunCommand } from './commands/dry-run.js';
+import { banner } from './output/theme.js';
 
 const VERSION = '0.1.0';
 
@@ -21,7 +22,10 @@ program
   .name('crosscheck')
   .description('Independent verification runtime for AI-generated code')
   .version(VERSION, '-v, --version', 'Print version')
-  .addHelpText('after', `
+  .addHelpText('beforeAll', banner() + '\n')
+  .addHelpText(
+    'after',
+    `
 Examples:
   crosscheck init
   crosscheck run -- claude -p "Add password reset"
@@ -31,7 +35,8 @@ Examples:
   crosscheck explain
   crosscheck inspect
   crosscheck override add --rule secret-leak --reason "dev env only"
-`);
+`,
+  );
 
 program.addCommand(buildRunCommand());
 program.addCommand(buildDryRunCommand());

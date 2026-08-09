@@ -35,7 +35,7 @@ npm install -g crosscheck
 
 **curl — macOS and Linux, no Node.js required**
 ```sh
-curl -fsSL https://raw.githubusercontent.com/eamonn/crosscheck/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/crosscheck-sh/crosscheck/main/scripts/install.sh | sh
 ```
 
 **PowerShell (Windows)**
@@ -100,9 +100,11 @@ crosscheck explain
 
 ```sh
 export ANTHROPIC_API_KEY=...
+
+# Optional — override the per-stage defaults shown here.
 export CROSSCHECK_MODEL_SCOUT=claude-haiku-4-5
-export CROSSCHECK_MODEL_REVIEWER=claude-sonnet-4-6
-export CROSSCHECK_MODEL_JUDGE=claude-opus-4-8
+export CROSSCHECK_MODEL_REVIEWER=claude-sonnet-5
+export CROSSCHECK_MODEL_JUDGE=claude-opus-5
 ```
 
 ## Policy

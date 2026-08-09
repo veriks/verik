@@ -1,8 +1,12 @@
 import { Command } from 'commander';
-import { join } from 'node:path';
 import { mkdir } from 'node:fs/promises';
 import { buildFakeRecord, buildFakePipeline, buildFakeContext } from '../output/fake-data.js';
-import { printHeader, printCommand, printChanges, printVerdictSummary } from '../output/terminal.js';
+import {
+  printHeader,
+  printCommand,
+  printChanges,
+  printVerdictSummary,
+} from '../output/terminal.js';
 import { buildAndSaveReport } from '../../core/reports/report-builder.js';
 import { saveRunJson } from '../../storage/local-run-store.js';
 import { runDir } from '../../storage/paths.js';
@@ -23,7 +27,13 @@ export function buildDemoCommand(): Command {
       await buildAndSaveReport(context, pipeline);
 
       if (options.json) {
-        console.log(JSON.stringify({ runId: context.runId, verdict: pipeline.judge?.verdict, policy: pipeline.policy }, null, 2));
+        console.log(
+          JSON.stringify(
+            { runId: context.runId, verdict: pipeline.judge?.verdict, policy: pipeline.policy },
+            null,
+            2,
+          ),
+        );
         return;
       }
 
@@ -38,8 +48,7 @@ export function buildDemoCommand(): Command {
         repoRoot: context.repoRoot,
       });
 
-      const reportPath = join(runDir(context.repoRoot, context.runId), 'report.md');
+      // printVerdictSummary already prints the report path — don't repeat it.
       console.log('(This was a demo run — no commands or LLMs were invoked.)');
-      console.log('Report written to:', reportPath);
     });
 }

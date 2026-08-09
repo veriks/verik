@@ -1,0 +1,126 @@
+import chalk from 'chalk';
+
+/**
+ * Crosscheck's visual identity, shared by every terminal surface.
+ *
+ * These hex values mirror the HTML report (src/core/reports/report-renderer-html.ts)
+ * so a verdict is the same colour whether you read it in the terminal or the
+ * browser. Chalk downgrades hex to 256- or 16-colour automatically depending on
+ * what the terminal advertises.
+ */
+export const palette = {
+  brand: '#3b82f6', // accent — rails, wordmark, links
+  block: '#ff4444',
+  warn: '#f59e0b',
+  pass: '#22c55e',
+  muted: '#a1a1a1',
+  subtle: '#525252',
+} as const;
+
+const colorEnabled = (): boolean => !!process.stdout.isTTY && !process.env['NO_COLOR'];
+
+/** Wraps a chalk style so it no-ops when colour is disabled. */
+const paint =
+  (style: (s: string) => string) =>
+  (s: string): string =>
+    colorEnabled() ? style(s) : s;
+
+export const brand = paint(chalk.hex(palette.brand));
+export const block = paint(chalk.hex(palette.block));
+export const warn = paint(chalk.hex(palette.warn));
+export const pass = paint(chalk.hex(palette.pass));
+export const muted = paint(chalk.hex(palette.muted));
+export const subtle = paint(chalk.hex(palette.subtle));
+export const bold = paint(chalk.bold);
+export const underline = paint(chalk.underline);
+
+/** The mark: a check and a cross — the two things the tool decides between. */
+export const mark = (): string => `${pass('✓')}${block('✕')}`;
+
+export const wordmark = (): string => `${mark()}  ${bold('crosscheck')}`;
+
+/** Total width of framed output, clamped so it stays readable in wide terminals. */
+export const frameWidth = (): number =>
+  Math.max(40, Math.min((process.stdout.columns ?? 80) - 2, 76));
+
+export const severityTint = (severity: string): ((s: string) => string) =>
+  severity === 'critical' || severity === 'high'
+    ? block
+    : severity === 'medium'
+      ? warn
+      : severity === 'info'
+        ? brand
+        : muted;
+
+export const verdictTint = (verdict: string): ((s: string) => string) =>
+  verdict === 'block' ? block : verdict === 'warn' ? warn : verdict === 'pass' ? pass : muted;
+
+export function wrap(text: string, width: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  if (!words.length) return [''];
+  const lines: string[] = [];
+  let line = '';
+  for (const word of words) {
+    if (line && line.length + 1 + word.length > width) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = line ? `${line} ${word}` : word;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+/**
+ * Draws a titled box. Padding is computed from the raw strings before any
+ * colour is applied — chalk's escape codes would otherwise corrupt the width.
+ */
+export function box(title: string, body: string, tint: (s: string) => string): string[] {
+  const w = frameWidth();
+  const head = `─ ${title} `;
+  const top = `╭${head}${'─'.repeat(Math.max(0, w - 2 - head.length))}╮`;
+  const bottom = `╰${'─'.repeat(w - 2)}╯`;
+
+  const out = [tint(top)];
+  for (const line of wrap(body, w - 4)) {
+    out.push(`${tint('│')} ${line.padEnd(w - 4)} ${tint('│')}`);
+  }
+  out.push(tint(bottom));
+  return out;
+}
+
+/**
+ * Three-row wordmark. Each glyph is 2–3 columns joined by a single space —
+ * tight kerning makes adjacent letters merge and become unreadable.
+ */
+const GLYPHS: Record<string, [string, string, string]> = {
+  c: ['┌─', '│ ', '└─'],
+  r: ['┬─┐', '├┬┘', '┴└─'],
+  o: ['┌─┐', '│ │', '└─┘'],
+  s: ['┌─┐', '└─┐', '└─┘'],
+  h: ['┬ ┬', '├─┤', '┴ ┴'],
+  e: ['┌─┐', '├┤ ', '└─┘'],
+  k: ['┬┌─', '├┴┐', '┴ ┴'],
+};
+
+/** Full wordmark banner — the brand moment on `crosscheck` with no arguments. */
+export function banner(): string {
+  const letters = [...'crosscheck'];
+  const rows = [0, 1, 2].map((r) => '  ' + letters.map((ch) => GLYPHS[ch]![r]).join(' '));
+  return [
+    '',
+    ...rows.map((r) => brand(r)),
+    '',
+    `  ${mark()}  ${muted('independent verification for AI-generated code')}`,
+  ].join('\n');
+}
+
+/** Full-width rule, optionally labelled. */
+export function rule(label?: string): string {
+  const w = frameWidth();
+  if (!label) return subtle('─'.repeat(w));
+  const text = ` ${label} `;
+  const side = Math.max(0, Math.floor((w - text.length) / 2));
+  return subtle('─'.repeat(side) + text + '─'.repeat(w - side - text.length));
+}
