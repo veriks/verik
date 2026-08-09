@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 export type ProjectType = 'node' | 'python' | 'generic';
@@ -19,7 +19,7 @@ export function detectProject(root: string): ProjectDetection {
   if (existsSync(join(root, 'package.json'))) {
     projectTypes.push('node');
     try {
-      const pkgRaw = require('node:fs').readFileSync(join(root, 'package.json'), 'utf8') as string;
+      const pkgRaw = readFileSync(join(root, 'package.json'), 'utf8');
       const pkg = JSON.parse(pkgRaw) as { scripts?: Record<string, string> };
       scripts = pkg.scripts ?? {};
     } catch {
@@ -42,7 +42,8 @@ export function detectProject(root: string): ProjectDetection {
 
   if (projectTypes.length === 0) projectTypes.push('generic');
 
-  const hasLockfile = existsSync(join(root, 'pnpm-lock.yaml')) ||
+  const hasLockfile =
+    existsSync(join(root, 'pnpm-lock.yaml')) ||
     existsSync(join(root, 'yarn.lock')) ||
     existsSync(join(root, 'package-lock.json')) ||
     existsSync(join(root, 'bun.lockb'));

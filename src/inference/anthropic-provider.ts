@@ -1,6 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { zodToJsonSchema as _zodToJsonSchema } from 'zod-to-json-schema';
-import type { LlmProvider, StructuredGenerationRequest, StructuredGenerationResult } from './llm-provider.js';
+import type {
+  LlmProvider,
+  StructuredGenerationRequest,
+  StructuredGenerationResult,
+} from './llm-provider.js';
 import { ProviderError } from '../shared/errors.js';
 import { sha256 } from '../shared/hashing.js';
 import { logger } from '../shared/logger.js';
@@ -15,7 +19,7 @@ export class AnthropicProvider implements LlmProvider {
   constructor(apiKey?: string) {
     this.client = new Anthropic({
       apiKey: apiKey ?? process.env['ANTHROPIC_API_KEY'],
-      maxRetries: 0,  // We handle retries ourselves for better error messages.
+      maxRetries: 0, // We handle retries ourselves for better error messages.
     });
   }
 
@@ -27,15 +31,21 @@ export class AnthropicProvider implements LlmProvider {
     const promptHash = sha256(request.systemPrompt);
     const inputHash = sha256(request.userContent);
 
-    const rawSchema = _zodToJsonSchema(request.schema, { target: 'jsonSchema7' });
-    const { $schema, ...inputSchema } = rawSchema as Record<string, unknown>;
+    const rawSchema = _zodToJsonSchema(request.schema, { target: 'jsonSchema7' }) as Record<
+      string,
+      unknown
+    >;
+    const inputSchema = { ...rawSchema };
+    delete inputSchema['$schema'];
 
     let lastError: unknown;
 
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       if (attempt > 0) {
         const delay = RETRY_BASE_MS * Math.pow(2, attempt - 1);
-        logger.debug(`Retrying ${request.stage} (attempt ${attempt + 1}/${MAX_RETRIES}) after ${delay}ms`);
+        logger.debug(
+          `Retrying ${request.stage} (attempt ${attempt + 1}/${MAX_RETRIES}) after ${delay}ms`,
+        );
         await sleep(delay);
       }
 
@@ -50,20 +60,23 @@ export class AnthropicProvider implements LlmProvider {
 
         let response: Awaited<ReturnType<typeof this.client.messages.create>>;
         try {
-          response = await this.client.messages.create({
-            model,
-            max_tokens: request.maxOutputTokens,
-            system: request.systemPrompt,
-            messages: [{ role: 'user', content: request.userContent }],
-            tools: [
-              {
-                name: 'structured_output',
-                description: `Return the ${request.stage} structured output`,
-                input_schema: inputSchema as Anthropic.Tool['input_schema'],
-              },
-            ],
-            tool_choice: { type: 'tool', name: 'structured_output' },
-          }, { signal });
+          response = await this.client.messages.create(
+            {
+              model,
+              max_tokens: request.maxOutputTokens,
+              system: request.systemPrompt,
+              messages: [{ role: 'user', content: request.userContent }],
+              tools: [
+                {
+                  name: 'structured_output',
+                  description: `Return the ${request.stage} structured output`,
+                  input_schema: inputSchema as Anthropic.Tool['input_schema'],
+                },
+              ],
+              tool_choice: { type: 'tool', name: 'structured_output' },
+            },
+            { signal },
+          );
         } finally {
           clearTimeout(timeoutId);
         }
@@ -79,27 +92,30 @@ export class AnthropicProvider implements LlmProvider {
         if (!parsed.success) {
           // One schema repair attempt — send the validation error back to the model.
           logger.debug(`${request.stage} schema validation failed, attempting repair`);
-          const repairResponse = await this.client.messages.create({
-            model,
-            max_tokens: request.maxOutputTokens,
-            system: request.systemPrompt,
-            messages: [
-              { role: 'user', content: request.userContent },
-              { role: 'assistant', content: response.content },
-              {
-                role: 'user',
-                content: `Your previous response failed schema validation: ${parsed.error.message}\n\nPlease call structured_output again with corrected output.`,
-              },
-            ],
-            tools: [
-              {
-                name: 'structured_output',
-                description: `Return the ${request.stage} structured output`,
-                input_schema: inputSchema as Anthropic.Tool['input_schema'],
-              },
-            ],
-            tool_choice: { type: 'tool', name: 'structured_output' },
-          }, { signal: request.abortSignal });
+          const repairResponse = await this.client.messages.create(
+            {
+              model,
+              max_tokens: request.maxOutputTokens,
+              system: request.systemPrompt,
+              messages: [
+                { role: 'user', content: request.userContent },
+                { role: 'assistant', content: response.content },
+                {
+                  role: 'user',
+                  content: `Your previous response failed schema validation: ${parsed.error.message}\n\nPlease call structured_output again with corrected output.`,
+                },
+              ],
+              tools: [
+                {
+                  name: 'structured_output',
+                  description: `Return the ${request.stage} structured output`,
+                  input_schema: inputSchema as Anthropic.Tool['input_schema'],
+                },
+              ],
+              tool_choice: { type: 'tool', name: 'structured_output' },
+            },
+            { signal: request.abortSignal },
+          );
 
           const repairTool = repairResponse.content.find(
             (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use',
@@ -113,8 +129,10 @@ export class AnthropicProvider implements LlmProvider {
           return {
             output: repaired.data,
             tokenUsage: {
-              inputTokens: (response.usage.input_tokens ?? 0) + (repairResponse.usage.input_tokens ?? 0),
-              outputTokens: (response.usage.output_tokens ?? 0) + (repairResponse.usage.output_tokens ?? 0),
+              inputTokens:
+                (response.usage.input_tokens ?? 0) + (repairResponse.usage.input_tokens ?? 0),
+              outputTokens:
+                (response.usage.output_tokens ?? 0) + (repairResponse.usage.output_tokens ?? 0),
             },
             durationMs: Date.now() - start,
             provider: 'anthropic',
@@ -136,7 +154,6 @@ export class AnthropicProvider implements LlmProvider {
           promptHash,
           inputHash,
         };
-
       } catch (err) {
         // Never retry on these — they won't resolve with more attempts.
         if (err instanceof ProviderError) throw err;
@@ -201,7 +218,9 @@ function sleep(ms: number): Promise<void> {
 function isAbortError(err: unknown): boolean {
   return (
     err instanceof Error &&
-    (err.name === 'AbortError' || err.message.includes('aborted') || err.message.includes('cancelled'))
+    (err.name === 'AbortError' ||
+      err.message.includes('aborted') ||
+      err.message.includes('cancelled'))
   );
 }
 
@@ -216,7 +235,10 @@ function anyAbort(...signals: (AbortSignal | undefined)[]): AbortSignal {
   const controller = new AbortController();
   for (const signal of signals) {
     if (!signal) continue;
-    if (signal.aborted) { controller.abort(); break; }
+    if (signal.aborted) {
+      controller.abort();
+      break;
+    }
     signal.addEventListener('abort', () => controller.abort(), { once: true });
   }
   return controller.signal;
