@@ -27,37 +27,51 @@ Be skeptical but fair. Return ONLY the structured ReviewerOutput JSON.`;
   Review focus: ${scout.reviewFocus.join(', ')}`
     : 'SCOUT: not available';
 
+  const mark = (s: string) => (s === 'passed' ? '✓' : s === 'unavailable' ? '?' : '✗');
   const builderSection = builder
     ? `BUILDER RESULTS (deterministic):
   Status: ${builder.overallStatus}
-  ${builder.commands.map((c) => `  ${c.status === 'passed' ? '✓' : '✗'} ${c.command} (${c.durationMs}ms)`).join('\n  ')}
-  ${builder.evidence.length ? 'Evidence:\n  ' + builder.evidence.map((e) => e.summary).join('\n  ') : ''}`
+  ${builder.commands.map((c) => `  ${mark(c.status)} ${c.command} → ${c.status} (${c.durationMs}ms)`).join('\n  ')}
+  ${builder.evidence.length ? 'Evidence:\n  ' + builder.evidence.map((e) => e.summary).join('\n  ') : ''}
+  ${builder.limitations.length ? 'Limitations:\n  ' + builder.limitations.join('\n  ') : ''}`
     : 'BUILDER: not run';
 
-  const deterministicSection = deterministicFindings.length > 0
-    ? `DETERMINISTIC RULE FINDINGS (already detected — do not re-report, but you may add analysis):\n` +
-      deterministicFindings.map((f) => `  [${f.severity.toUpperCase()}] ${f.title}: ${f.message}`).join('\n')
-    : 'DETERMINISTIC RULES: no findings';
+  const deterministicSection =
+    deterministicFindings.length > 0
+      ? `DETERMINISTIC RULE FINDINGS (already detected — do not re-report, but you may add analysis):\n` +
+        deterministicFindings
+          .map((f) => `  [${f.severity.toUpperCase()}] ${f.title}: ${f.message}`)
+          .join('\n')
+      : 'DETERMINISTIC RULES: no findings';
 
   // Historical findings from memory — most relevant when the same file has failed review before
-  const memorySection = historicalFindings.length > 0
-    ? `HISTORICAL FINDINGS FOR CHANGED FILES (from previous runs on this repository):\n` +
-      historicalFindings.slice(0, 10).map((f) =>
-        `  [${f.severity.toUpperCase()}] ${f.title} — ${f.judgeDisposed} in run ${f.runId.slice(0, 12)} (confidence was ${(f.confidence * 100).toFixed(0)}%)`
-      ).join('\n') +
-      '\nThese are prior findings on the same files. Consider whether this change addresses, repeats, or worsens them.'
-    : '';
+  const memorySection =
+    historicalFindings.length > 0
+      ? `HISTORICAL FINDINGS FOR CHANGED FILES (from previous runs on this repository):\n` +
+        historicalFindings
+          .slice(0, 10)
+          .map(
+            (f) =>
+              `  [${f.severity.toUpperCase()}] ${f.title} — ${f.judgeDisposed} in run ${f.runId.slice(0, 12)} (confidence was ${(f.confidence * 100).toFixed(0)}%)`,
+          )
+          .join('\n') +
+        '\nThese are prior findings on the same files. Consider whether this change addresses, repeats, or worsens them.'
+      : '';
 
-  // Use selected context if available; fall back to raw diff
-  const patch = selectedContext?.diff ?? diff?.patch ?? '(no diff)';
+  // Use selected context if available; fall back to the sanitised diff — never
+  // to diff.patch, which carries unredacted secrets.
+  const patch = selectedContext?.diff ?? diff?.safePatch ?? '(no diff)';
   const maxBytes = config.verification.maxDiffBytes;
-  const patchSection = patch.length > maxBytes
-    ? patch.slice(0, maxBytes) + '\n... [truncated]'
-    : patch;
+  const patchSection =
+    patch.length > maxBytes ? patch.slice(0, maxBytes) + '\n... [truncated]' : patch;
 
   const fileContents = selectedContext?.changedFiles.length
-    ? '\n\nCHANGED FILE CONTENTS:\n' + selectedContext.changedFiles
-        .map((f) => `--- ${f.path} (lines ${f.startLine}-${f.endLine}${f.truncated ? ', truncated' : ''}) ---\n${f.content}`)
+    ? '\n\nCHANGED FILE CONTENTS:\n' +
+      selectedContext.changedFiles
+        .map(
+          (f) =>
+            `--- ${f.path} (lines ${f.startLine}-${f.endLine}${f.truncated ? ', truncated' : ''}) ---\n${f.content}`,
+        )
         .join('\n\n')
     : '';
 

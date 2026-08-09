@@ -1,5 +1,6 @@
 import { execa } from 'execa';
 import { tailLog } from './log-sanitizer.js';
+import { canExecute } from './executable-lookup.js';
 import type { BuilderCommandResult } from './builder-schema.js';
 import type { PlannedCommand } from './command-planner.js';
 
@@ -13,6 +14,21 @@ export async function executeCommand(
   const parts = planned.command.split(' ');
   const bin = parts[0]!;
   const args = parts.slice(1);
+
+  // Resolved before spawning: an unrunnable tool must not be reported as a
+  // failing one. See executable-lookup.ts — the two are indistinguishable by
+  // exit code once cmd.exe has had its say.
+  if (!canExecute(bin)) {
+    return {
+      name: planned.name,
+      command: planned.command,
+      status: 'unavailable',
+      exitCode: 0,
+      durationMs: Date.now() - start,
+      stdoutTail: '',
+      stderrTail: `${bin} was not found on PATH — this check did not run.`,
+    };
+  }
 
   try {
     const result = await execa(bin, args, {

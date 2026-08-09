@@ -9,6 +9,7 @@ const tmpId = customAlphabet('abcdefghijklmnopqrstuvwxyz0123456789', 8);
 export interface TestRepo {
   root: string;
   write: (path: string, content: string) => Promise<void>;
+  remove: (path: string) => Promise<void>;
   commit: (message: string) => Promise<void>;
   cleanup: () => Promise<void>;
 }
@@ -34,6 +35,11 @@ export async function createTestRepo(): Promise<TestRepo> {
     await writeFile(full, content, 'utf8');
   };
 
+  /** Deletes from the worktree only — the index is left alone, as an agent would. */
+  const remove = async (relativePath: string) => {
+    await rm(join(root, relativePath), { force: true });
+  };
+
   const commit = async (message: string) => {
     await git.add('.');
     await git.commit(message);
@@ -43,11 +49,15 @@ export async function createTestRepo(): Promise<TestRepo> {
     await rm(root, { recursive: true, force: true });
   };
 
-  return { root, write, commit, cleanup };
+  return { root, write, remove, commit, cleanup };
 }
 
 /** Write and commit an initial file so HEAD exists. */
-export async function initWithCommit(repo: TestRepo, filename = 'README.md', content = '# test'): Promise<void> {
+export async function initWithCommit(
+  repo: TestRepo,
+  filename = 'README.md',
+  content = '# test',
+): Promise<void> {
   await repo.write(filename, content);
   await repo.commit('Initial commit');
 }
