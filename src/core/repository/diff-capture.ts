@@ -1,6 +1,6 @@
 import { readFile, stat } from 'node:fs/promises';
-import { join } from 'node:path';
 import { simpleGit } from 'simple-git';
+import { resolveInsideRepo } from '../../shared/paths-safe.js';
 import type { RepositorySnapshot } from './repository-snapshot.js';
 import { logger } from '../../shared/logger.js';
 
@@ -42,20 +42,51 @@ export async function computeDiff(
   const changedFiles: ChangedFile[] = [];
 
   for (const p of status.modified) {
-    changedFiles.push({ path: p, changeType: 'modified', additions: 0, deletions: 0, isBinary: false });
+    changedFiles.push({
+      path: p,
+      changeType: 'modified',
+      additions: 0,
+      deletions: 0,
+      isBinary: false,
+    });
   }
   for (const p of status.created) {
-    changedFiles.push({ path: p, changeType: 'added', additions: 0, deletions: 0, isBinary: false });
+    changedFiles.push({
+      path: p,
+      changeType: 'added',
+      additions: 0,
+      deletions: 0,
+      isBinary: false,
+    });
   }
   for (const p of status.deleted) {
-    changedFiles.push({ path: p, changeType: 'deleted', additions: 0, deletions: 0, isBinary: false });
+    changedFiles.push({
+      path: p,
+      changeType: 'deleted',
+      additions: 0,
+      deletions: 0,
+      isBinary: false,
+    });
   }
   for (const r of status.renamed) {
-    changedFiles.push({ path: r.to, previousPath: r.from, changeType: 'renamed', additions: 0, deletions: 0, isBinary: false });
+    changedFiles.push({
+      path: r.to,
+      previousPath: r.from,
+      changeType: 'renamed',
+      additions: 0,
+      deletions: 0,
+      isBinary: false,
+    });
   }
   if (includeUntracked) {
     for (const p of status.not_added) {
-      changedFiles.push({ path: p, changeType: 'untracked', additions: 0, deletions: 0, isBinary: false });
+      changedFiles.push({
+        path: p,
+        changeType: 'untracked',
+        additions: 0,
+        deletions: 0,
+        isBinary: false,
+      });
     }
   }
 
@@ -96,7 +127,10 @@ export async function getFileContent(
   filePath: string,
   maxBytes: number,
 ): Promise<string | null> {
-  const fullPath = join(root, filePath);
+  // See file-slicer.ts — a committed symlink can escape the repository.
+  const fullPath = await resolveInsideRepo(root, filePath);
+  if (!fullPath) return null;
+
   try {
     const info = await stat(fullPath);
     if (info.size > maxBytes) return null;
