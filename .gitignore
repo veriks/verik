@@ -8,3 +8,6 @@ releases/
 .env
 .env.*
 .claude/
+
+# Local scratch and reference material — never committed.
+.reference/

@@ -1,11 +1,22 @@
+/**
+ * Per-stage model defaults, tiered by how much capability each stage needs.
+ *
+ * Scout triages the diff (cheap), Reviewer does the analysis, Judge makes the
+ * final call — the verdict is the product, so it gets the strongest model.
+ *
+ * Override per stage with CROSSCHECK_MODEL_{SCOUT,REVIEWER,JUDGE}, or by
+ * setting `models` in .crosscheck/config.json.
+ */
+export const DEFAULT_MODELS = {
+  scout: 'claude-haiku-4-5',
+  reviewer: 'claude-sonnet-5',
+  judge: 'claude-opus-5',
+} as const;
+
 export const DEFAULT_CONFIG = {
   version: 1 as const,
   provider: 'anthropic',
-  models: {
-    scout: 'configured-through-environment',
-    reviewer: 'configured-through-environment',
-    judge: 'configured-through-environment',
-  },
+  models: { ...DEFAULT_MODELS },
   builder: {
     enabled: true,
     timeoutMs: 600_000,

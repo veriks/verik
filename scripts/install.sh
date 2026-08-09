@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -e
 
-REPO="eamonn/crosscheck"
+REPO="crosscheck-sh/crosscheck"
 INSTALL_DIR="${CROSSCHECK_INSTALL_DIR:-/usr/local/bin}"
 
 # ─── detect platform ──────────────────────────────────────────────────────────

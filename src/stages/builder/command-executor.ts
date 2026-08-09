@@ -7,7 +7,7 @@ export async function executeCommand(
   planned: PlannedCommand,
   cwd: string,
   timeoutMs: number,
-  index: number,
+  _index: number,
 ): Promise<BuilderCommandResult> {
   const start = Date.now();
   const parts = planned.command.split(' ');
@@ -24,11 +24,7 @@ export async function executeCommand(
     });
 
     const durationMs = Date.now() - start;
-    const status = result.timedOut
-      ? 'timed_out'
-      : result.exitCode === 0
-      ? 'passed'
-      : 'failed';
+    const status = result.timedOut ? 'timed_out' : result.exitCode === 0 ? 'passed' : 'failed';
 
     return {
       name: planned.name,

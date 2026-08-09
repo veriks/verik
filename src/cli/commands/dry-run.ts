@@ -9,21 +9,20 @@ import { selectContext } from '../../core/context/context-selector.js';
 import { detectProject } from '../../stages/builder/project-detector.js';
 import { planCommands } from '../../stages/builder/command-planner.js';
 import { getActiveOverrides } from '../../core/memory/memory-store.js';
-import { estimateTokens } from '../../shared/tokens.js';
 
 const c = () => process.stdout.isTTY && !process.env['NO_COLOR'];
-const dim = (s: string) => c() ? chalk.dim(s) : s;
-const bold = (s: string) => c() ? chalk.bold(s) : s;
-const green = (s: string) => c() ? chalk.green(s) : s;
-const yellow = (s: string) => c() ? chalk.yellow(s) : s;
-const red = (s: string) => c() ? chalk.red(s) : s;
+const dim = (s: string) => (c() ? chalk.dim(s) : s);
+const bold = (s: string) => (c() ? chalk.bold(s) : s);
+const green = (s: string) => (c() ? chalk.green(s) : s);
+const yellow = (s: string) => (c() ? chalk.yellow(s) : s);
+const red = (s: string) => (c() ? chalk.red(s) : s);
 
 export function buildDryRunCommand(): Command {
   return new Command('dry-run')
     .description('Preview what crosscheck run would do — no subprocess, no LLM calls')
     .argument('<command...>', 'Command that would be run (after --)')
     .option('--intent <text>', 'User intent description')
-    .action(async (commandArgs: string[], options: { intent?: string }) => {
+    .action(async (commandArgs: string[], _options: { intent?: string }) => {
       try {
         const cwd = process.cwd();
         const info = await getRepositoryInfo(cwd);
@@ -41,34 +40,48 @@ export function buildDryRunCommand(): Command {
         // Repository state
         console.log(bold('Repository'));
         console.log(`  ${root}`);
-        console.log(`  Branch: ${info.branch}  Commit: ${info.commitSha.slice(0,8)}`);
+        console.log(`  Branch: ${info.branch}  Commit: ${info.commitSha.slice(0, 8)}`);
         console.log(`  Repo ID: ${fingerprint.repoId}`);
-        console.log(`  Dirty: ${info.isDirty ? yellow('yes (pre-existing changes exist)') : green('no')}`);
+        console.log(
+          `  Dirty: ${info.isDirty ? yellow('yes (pre-existing changes exist)') : green('no')}`,
+        );
         console.log();
 
         // Current diff (what would be attributed to the command if run now)
         const snapshot = await captureSnapshot(root, config.verification.maxFileBytes);
-        const diff = await computeDiff(root, snapshot, config.verification.maxDiffBytes, config.verification.includeUntrackedFiles);
+        const diff = await computeDiff(
+          root,
+          snapshot,
+          config.verification.maxDiffBytes,
+          config.verification.includeUntrackedFiles,
+        );
 
         if (diff.changedFiles.length > 0) {
-          console.log(yellow('⚠ Repository has uncommitted changes that would be treated as pre-existing:'));
+          console.log(
+            yellow('⚠ Repository has uncommitted changes that would be treated as pre-existing:'),
+          );
           for (const f of diff.changedFiles.slice(0, 8)) {
             console.log(dim(`  ${f.changeType}: ${f.path}`));
           }
-          if (diff.changedFiles.length > 8) console.log(dim(`  ... and ${diff.changedFiles.length - 8} more`));
+          if (diff.changedFiles.length > 8)
+            console.log(dim(`  ... and ${diff.changedFiles.length - 8} more`));
           console.log();
         }
 
         // Policy
         console.log(bold('Policy'));
         console.log(`  Mode: ${policy.mode}`);
-        console.log(`  Block at: ${policy.blockAtSeverity} severity ≥ ${policy.minimumBlockingConfidence * 100}% confidence`);
+        console.log(
+          `  Block at: ${policy.blockAtSeverity} severity ≥ ${policy.minimumBlockingConfidence * 100}% confidence`,
+        );
         console.log();
 
         // Builder
         console.log(bold('Builder (deterministic)'));
         const detection = detectProject(root);
-        console.log(`  Project: ${detection.projectTypes.join(', ')}${detection.packageManager ? ` · ${detection.packageManager}` : ''}`);
+        console.log(
+          `  Project: ${detection.projectTypes.join(', ')}${detection.packageManager ? ` · ${detection.packageManager}` : ''}`,
+        );
         const planned = planCommands(detection, config.builder.commands ?? []);
         if (planned.length === 0) {
           console.log(`  ${dim('No commands detected')}`);
@@ -82,9 +95,15 @@ export function buildDryRunCommand(): Command {
 
         // Context budget
         console.log(bold('Context budget (per LLM call)'));
-        const sampleDiff = { ...diff, changedFiles: [], commandIntroducedPaths: [], preExistingChangedPaths: [] };
+        const sampleDiff = {
+          ...diff,
+          changedFiles: [],
+          commandIntroducedPaths: [],
+          preExistingChangedPaths: [],
+        };
         const ctx = await selectContext({
-          repoRoot: root, diff: sampleDiff,
+          repoRoot: root,
+          diff: sampleDiff,
           maxDiffBytes: config.verification.maxDiffBytes,
           maxFileBytes: config.verification.maxFileBytes,
           maxTotalTokens: 60_000,
@@ -114,7 +133,13 @@ export function buildDryRunCommand(): Command {
         if (overrides.length > 0) {
           console.log(bold(`Active overrides (${overrides.length})`));
           for (const o of overrides) {
-            const scope = [o.ruleId && `rule:${o.ruleId}`, o.filePath && `path:${o.filePath}`, o.titlePattern && `title:/${o.titlePattern}/`].filter(Boolean).join(', ');
+            const scope = [
+              o.ruleId && `rule:${o.ruleId}`,
+              o.filePath && `path:${o.filePath}`,
+              o.titlePattern && `title:/${o.titlePattern}/`,
+            ]
+              .filter(Boolean)
+              .join(', ');
             console.log(`  ${dim(o.id)}  ${scope || 'all'}  — ${o.reason}`);
           }
           console.log();
