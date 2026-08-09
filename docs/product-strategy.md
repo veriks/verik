@@ -125,8 +125,8 @@ false positive on someone's real diff becomes the lasting impression.
 
 ## 4. Licence and open source
 
-**Working position: Apache-2.0, repo stays private for now, open it once
-validated.**
+**Applied: Apache-2.0** (`LICENSE` + `NOTICE`, `license` field in
+`package.json`). Repo stays private for now; open it once validated.
 
 - **Apache-2.0 over MIT** — it explicitly reserves trademarks (MIT is silent) and
   carries a patent grant that enterprise legal teams look for.

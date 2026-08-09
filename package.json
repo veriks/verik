@@ -10,7 +10,8 @@
   "files": [
     "dist",
     "!dist/**/*.map",
-    "README.md"
+    "README.md",
+    "NOTICE"
   ],
   "scripts": {
     "build":        "tsup",
@@ -73,7 +74,7 @@
     ]
   },
   "keywords": ["ai", "code-review", "verification", "claude", "coding-agent", "security"],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/crosscheck-sh/crosscheck"
