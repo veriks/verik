@@ -1,72 +1,24 @@
-import chalk from 'chalk';
 import type { PipelineResult } from '../../core/pipeline/verification-pipeline.js';
 import type { OrchestratorResult } from '../../core/run/run-orchestrator.js';
 import type { Finding } from '../../stages/reviewer/reviewer-schema.js';
 import { runDir } from '../../storage/paths.js';
 import { join, relative } from 'node:path';
-
-const colorEnabled = (): boolean => !!process.stdout.isTTY && !process.env['NO_COLOR'];
-
-/**
- * Wraps a chalk style so it becomes a no-op when colour is disabled. Lets the
- * rest of this file be written once instead of as paired if/else branches.
- */
-const paint =
-  (style: (s: string) => string) =>
-  (s: string): string =>
-    colorEnabled() ? style(s) : s;
-
-const bold = paint(chalk.bold);
-const dim = paint(chalk.dim);
-const red = paint(chalk.red);
-const green = paint(chalk.green);
-const yellow = paint(chalk.yellow);
-const cyan = paint(chalk.cyan);
-const underline = paint(chalk.underline);
-
-/** Total width of framed output, clamped so it stays readable in wide terminals. */
-const frameWidth = (): number => Math.max(40, Math.min((process.stdout.columns ?? 80) - 2, 76));
-
-function wrap(text: string, width: number): string[] {
-  const words = text.split(/\s+/).filter(Boolean);
-  if (!words.length) return [''];
-  const lines: string[] = [];
-  let line = '';
-  for (const word of words) {
-    if (line && line.length + 1 + word.length > width) {
-      lines.push(line);
-      line = word;
-    } else {
-      line = line ? `${line} ${word}` : word;
-    }
-  }
-  if (line) lines.push(line);
-  return lines;
-}
-
-/**
- * Draws a titled box. Padding is computed from the raw strings before any
- * colour is applied — chalk's escape codes would otherwise corrupt the width.
- */
-function box(title: string, body: string, tint: (s: string) => string): string[] {
-  const w = frameWidth();
-  const head = `─ ${title} `;
-  const top = `╭${head}${'─'.repeat(Math.max(0, w - 2 - head.length))}╮`;
-  const bottom = `╰${'─'.repeat(w - 2)}╯`;
-
-  const out = [tint(top)];
-  for (const line of wrap(body, w - 4)) {
-    out.push(`${tint('│')} ${line.padEnd(w - 4)} ${tint('│')}`);
-  }
-  out.push(tint(bottom));
-  return out;
-}
-
-const severityTint = (severity: string): ((s: string) => string) =>
-  severity === 'critical' || severity === 'high' ? red : severity === 'medium' ? yellow : dim;
-
-const verdictTint = (verdict: string): ((s: string) => string) =>
-  verdict === 'block' ? red : verdict === 'warn' ? yellow : verdict === 'pass' ? green : dim;
+import {
+  bold,
+  box,
+  brand,
+  block,
+  frameWidth,
+  mark,
+  muted,
+  pass,
+  rule,
+  severityTint,
+  subtle,
+  underline,
+  verdictTint,
+  wordmark,
+} from './theme.js';
 
 /** Prefer a repo-relative path — absolute paths dominate the line and add no information. */
 function shortPath(absolute: string): string {
@@ -75,11 +27,16 @@ function shortPath(absolute: string): string {
 }
 
 export function printHeader(runId: string): void {
-  console.log(`\n${bold('Crosscheck')} ${dim('·')} ${dim(runId)}`);
+  const left = `${mark()}  ${bold('crosscheck')}`;
+  // Pad on the raw text, not the coloured string — escape codes have no width.
+  const rawLeft = `✓✕  crosscheck`;
+  const gap = Math.max(1, frameWidth() - rawLeft.length - runId.length);
+  console.log(`\n${left}${' '.repeat(gap)}${subtle(runId)}`);
+  console.log(rule());
 }
 
 export function printCommand(command: string[]): void {
-  console.log(dim('$ ') + cyan(command.join(' ')));
+  console.log(`${brand('$')} ${command.join(' ')}`);
 }
 
 /**
@@ -88,39 +45,42 @@ export function printCommand(command: string[]): void {
  * and Crosscheck output begins.
  */
 export function printVerificationSeparator(): void {
-  const label = ' Crosscheck verification ';
-  const side = Math.max(0, Math.floor((frameWidth() - label.length) / 2));
-  const line = '─'.repeat(side);
-  console.log(`\n${dim(line + label + line)}\n`);
+  console.log(`\n${rule('crosscheck')}\n`);
 }
 
 export function printChanges(additions: number, deletions: number, fileCount: number): void {
   const files = `${fileCount} file${fileCount === 1 ? '' : 's'}`;
-  console.log(`${dim(files)}  ${green(`+${additions}`)} ${red(`−${deletions}`)}\n`);
+  console.log(
+    `${muted(files)} ${subtle('·')} ${pass(`+${additions}`)} ${block(`−${deletions}`)}\n`,
+  );
 }
 
-/** One aligned row per pipeline stage, so the four stages read as a single unit. */
+/**
+ * One row per pipeline stage, hung off a brand-coloured rail so the four
+ * stages read as a single connected pipeline rather than four separate blocks.
+ */
 function printStageRail(pipeline: PipelineResult): void {
   const { scout, builder, reviewer, judge } = pipeline;
-  const row = (name: string, value: string) => console.log(`  ${dim(name.padEnd(10))}${value}`);
+  const rail = brand('│');
+  const row = (name: string, value: string) =>
+    console.log(`${rail}  ${muted(name.padEnd(10))}${value}`);
 
   if (scout) {
-    const tint = severityTint(scout.riskLevel);
-    const areas = scout.affectedAreas.length ? dim(` · ${scout.affectedAreas.join(' · ')}`) : '';
-    row('Scout', tint(`${scout.riskLevel.toUpperCase()} RISK`) + areas);
+    const areas = scout.affectedAreas.length ? subtle(` · ${scout.affectedAreas.join(' · ')}`) : '';
+    row('Scout', severityTint(scout.riskLevel)(`${scout.riskLevel.toUpperCase()} RISK`) + areas);
   }
 
   if (builder) {
     const marks = builder.commands
       .map((cmd) =>
         cmd.status === 'passed'
-          ? green(`✓ ${cmd.name}`)
+          ? pass(`✓ ${cmd.name}`)
           : cmd.status === 'failed'
-            ? red(`✗ ${cmd.name}`)
-            : dim(`– ${cmd.name}`),
+            ? block(`✗ ${cmd.name}`)
+            : subtle(`– ${cmd.name}`),
       )
       .join('  ');
-    row('Builder', marks || dim('no commands detected'));
+    row('Builder', marks || subtle('no commands detected'));
   }
 
   if (reviewer) {
@@ -128,15 +88,15 @@ function printStageRail(pipeline: PipelineResult): void {
     const high = reviewer.findings.filter(
       (f) => f.severity === 'high' || f.severity === 'critical',
     ).length;
-    const summary = `${n} finding${n === 1 ? '' : 's'}`;
-    row('Reviewer', n === 0 ? green(summary) : `${summary}${high ? red(` · ${high} high`) : ''}`);
+    const label = `${n} finding${n === 1 ? '' : 's'}`;
+    row('Reviewer', n === 0 ? pass(label) : label + (high ? block(` · ${high} high`) : ''));
   }
 
   if (judge) {
     const pct = Math.round(judge.confidence * 100);
     row(
       'Judge',
-      verdictTint(judge.verdict)(bold(judge.verdict.toUpperCase())) + dim(` · ${pct}% confidence`),
+      verdictTint(judge.verdict)(bold(judge.verdict.toUpperCase())) + subtle(` · ${pct}%`),
     );
   }
 
@@ -152,18 +112,20 @@ function printFindings(findings: Finding[], limit = 5): void {
     (a, b) => order.indexOf(a.severity) - order.indexOf(b.severity),
   );
 
-  console.log(bold('Findings'));
+  console.log(muted('FINDINGS'));
   for (const f of ranked.slice(0, limit)) {
-    const badge = severityTint(f.severity)(f.severity.toUpperCase().padEnd(8));
-    console.log(`  ${badge}${f.title}`);
+    const tint = severityTint(f.severity);
+    // A colour bar carries severity at a glance; the label keeps it readable
+    // without colour and for anyone who can't distinguish the hues.
+    console.log(`${tint('▊')} ${tint(f.severity.toUpperCase().padEnd(8))}${f.title}`);
     const ev = f.evidence[0];
     if (ev) {
       const loc = ev.startLine ? `:${ev.startLine}` : '';
-      console.log(`  ${' '.repeat(8)}${dim(ev.path + loc)}`);
+      console.log(`${tint('▊')} ${' '.repeat(8)}${subtle(ev.path + loc)}`);
     }
   }
   if (ranked.length > limit) {
-    console.log(dim(`  … ${ranked.length - limit} more in the full report`));
+    console.log(subtle(`  … ${ranked.length - limit} more in the full report`));
   }
   console.log();
 }
@@ -195,18 +157,20 @@ export function printVerdictSummary(
   const dismissed = judge?.dismissedFindings.length ?? 0;
   if (dismissed) {
     console.log(
-      dim(`  Judge dismissed ${dismissed} finding${dismissed === 1 ? '' : 's'} as unsupported.\n`),
+      subtle(`Judge dismissed ${dismissed} finding${dismissed === 1 ? '' : 's'} as unsupported.\n`),
     );
   }
 
   const reportPath = shortPath(join(runDir(result.repoRoot, result.runId), 'report.md'));
-  console.log(`${dim('Report')}  ${underline(reportPath)}`);
+  console.log(`${muted('report')}  ${underline(brand(reportPath))}`);
 
   // Nudge: if Scout found HIGH/CRITICAL risk and no intent was provided,
   // remind the user that --intent improves analysis quality.
   if (scout && !intent && (scout.riskLevel === 'high' || scout.riskLevel === 'critical')) {
     console.log(
-      dim(`\nTip: re-run with --intent "what this change was meant to do" for sharper analysis.`),
+      subtle(
+        `\nTip: re-run with --intent "what this change was meant to do" for sharper analysis.`,
+      ),
     );
   }
 
@@ -214,11 +178,11 @@ export function printVerdictSummary(
 }
 
 export function printNoChanges(): void {
-  console.log(dim('Crosscheck: no repository changes detected.'));
+  console.log(`${wordmark()}  ${muted('no repository changes detected.')}`);
 }
 
 export function printError(message: string): void {
-  console.error(`${red('Error:')} ${message}`);
+  console.error(`${block('✕')} ${message}`);
 }
 
 export function printJson(data: unknown): void {
