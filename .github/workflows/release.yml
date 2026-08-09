@@ -17,19 +17,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: pnpm
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build ESM bundle (for npm)
-        run: npm run build
+        run: pnpm build
 
       - name: Build CJS bundle (for binaries)
-        run: npx tsup --config tsup.binary.config.ts
+        run: pnpm exec tsup --config tsup.binary.config.ts
 
       - name: Build standalone binaries
         run: node scripts/pkg-build.mjs
