@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { getRepositoryInfo } from '../../core/repository/git-repository.js';
 import { CrosscheckError } from '../../shared/errors.js';
 import { DEFAULT_CONFIG, DEFAULT_POLICY } from '../../config/defaults.js';
+import { getOrCreateFingerprint } from '../../core/repository/repo-fingerprint.js';
 
 export function buildInitCommand(): Command {
   return new Command('init')
@@ -12,24 +13,27 @@ export function buildInitCommand(): Command {
       try {
         const info = await getRepositoryInfo(process.cwd());
         const ccDir = join(info.root, '.crosscheck');
-        const runsDir = join(ccDir, 'runs');
-        const cacheDir = join(ccDir, 'cache');
 
         await mkdir(ccDir, { recursive: true });
-        await mkdir(runsDir, { recursive: true });
-        await mkdir(cacheDir, { recursive: true });
+        await mkdir(join(ccDir, 'runs'), { recursive: true });
+        await mkdir(join(ccDir, 'cache'), { recursive: true });
 
-        const configPath = join(ccDir, 'config.json');
-        const policyPath = join(ccDir, 'policy.json');
-        const gitignorePath = join(ccDir, '.gitignore');
+        const configPath  = join(ccDir, 'config.json');
+        const policyPath  = join(ccDir, 'policy.json');
+        const ignorePath  = join(ccDir, '.gitignore');
 
         await writeFile(configPath, JSON.stringify(DEFAULT_CONFIG, null, 2), 'utf8');
         await writeFile(policyPath, JSON.stringify(DEFAULT_POLICY, null, 2), 'utf8');
-        await writeFile(gitignorePath, 'runs/\ncache/\n', 'utf8');
+        await writeFile(ignorePath, 'runs/\ncache/\n', 'utf8');
+
+        // Create a stable repo fingerprint immediately so memory is scoped
+        // correctly from the very first run, not only after the first LLM call.
+        const fingerprint = await getOrCreateFingerprint(info.root, info.remote);
 
         console.log('Crosscheck initialized.');
-        console.log(`  Config: ${configPath}`);
-        console.log(`  Policy: ${policyPath}`);
+        console.log(`  Config:  ${configPath}`);
+        console.log(`  Policy:  ${policyPath}`);
+        console.log(`  Repo ID: ${fingerprint.repoId}`);
         console.log('');
         console.log('Set your API key:');
         console.log('  export ANTHROPIC_API_KEY=...');

@@ -1,4 +1,3 @@
-import { z } from 'zod';
 import type { ZodType } from 'zod';
 import type { TokenUsage } from '../shared/schemas.js';
 
@@ -10,6 +9,8 @@ export interface StructuredGenerationRequest<T> {
   model: string;
   maxOutputTokens: number;
   temperature: number;
+  promptVersion: string;
+  timeoutMs?: number;
   abortSignal?: AbortSignal;
 }
 
@@ -19,6 +20,8 @@ export interface StructuredGenerationResult<T> {
   durationMs: number;
   provider: string;
   model: string;
+  promptHash: string;   // SHA256 of systemPrompt — stable identity for this prompt version
+  inputHash: string;    // SHA256 of userContent — lets you detect same-input/different-output
 }
 
 export interface LlmProvider {

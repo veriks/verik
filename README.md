@@ -2,7 +2,7 @@
 
 Crosscheck is an independent verification runtime for AI-generated code.
 
-> **The system writing code should not be the only system deciding whether that code is safe to ship.**
+> **Unlike traditional AI code review, Crosscheck separates generation from verification. The system that writes code is never the same system that decides whether it should be trusted..**
 
 ## How it works
 
@@ -11,7 +11,7 @@ Crosscheck wraps any coding agent or development command, captures the repositor
 ```
 Wrapped command
       ↓
-Repository delta
+Attributed repository diff
       ↓
    Scout
       ↓
@@ -28,17 +28,25 @@ Terminal + report
 
 ## Install
 
+**npm — works everywhere Node.js is installed**
 ```sh
-pnpm install
-pnpm build
+npm install -g crosscheck
 ```
 
-Link the binary for local use:
-
+**curl — macOS and Linux, no Node.js required**
 ```sh
-node dist/index.js --version
-# or link globally:
-# pnpm link --global
+curl -fsSL https://raw.githubusercontent.com/eamonn/crosscheck/main/scripts/install.sh | sh
+```
+
+**PowerShell (Windows)**
+```powershell
+npm install -g crosscheck
+```
+
+**npx — one-off without installing**
+```sh
+npx crosscheck init
+npx crosscheck run -- claude -p "your prompt"
 ```
 
 ## Quick start
@@ -51,10 +59,11 @@ crosscheck init
 export ANTHROPIC_API_KEY=your-key-here
 
 # 3. Wrap a coding agent or any command
-crosscheck run -- claude -p "Add password reset support"
+crosscheck run -- claude -p "Add OAuth login"
 crosscheck run -- codex
-crosscheck run -- npm run generate
-crosscheck run -- python script.py
+crosscheck run -- aider
+crosscheck run -- amp
+crosscheck verify
 
 # 4. Check the verdict
 crosscheck report
@@ -121,7 +130,7 @@ export CROSSCHECK_MODEL_JUDGE=claude-opus-4-8
 
 **Scout** — understands the scope, intent, and risk level of the change.
 
-**Builder** — runs your project's build, test, typecheck, and lint commands. Produces concrete pass/fail evidence.
+**Builder** — runs your project's build, test, typecheck, and lint commands. Produces deterministic runtime evidence.
 
 **Reviewer** — deep evidence-based analysis. Every finding cites exact file paths and diff evidence.
 
@@ -152,6 +161,16 @@ pnpm typecheck
 pnpm test
 pnpm build
 ```
+
+## Principles
+
+Crosscheck follows a few non-negotiable rules.
+
+- The verifier is independent from the generator.
+- Every finding references evidence.
+- AI recommendations never execute shell commands.
+- Deterministic evidence always takes precedence over model opinion.
+- Crosscheck never mutates your repository during verification.
 
 ---
 

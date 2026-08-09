@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "provider": "anthropic",
+  "models": {
+    "scout": "configured-through-environment",
+    "reviewer": "configured-through-environment",
+    "judge": "configured-through-environment"
+  },
+  "builder": {
+    "enabled": true,
+    "timeoutMs": 600000,
+    "maxLogBytes": 100000,
+    "installDependencies": false
+  },
+  "verification": {
+    "includeUntrackedFiles": true,
+    "maxDiffBytes": 500000,
+    "maxFileBytes": 150000
+  },
+  "privacy": {
+    "redactEnvironmentValues": true,
+    "excludePatterns": [
+      ".env",
+      ".env.*",
+      "**/*.pem",
+      "**/*.key",
+      "**/credentials.*"
+    ]
+  },
+  "inferenceTimeoutMs": 120000,
+  "runsToKeep": 100
+}

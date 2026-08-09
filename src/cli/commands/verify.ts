@@ -5,13 +5,16 @@ import { computeDiff } from '../../core/repository/diff-capture.js';
 import { loadConfig, loadPolicy } from '../../config/config-loader.js';
 import { generateRunId } from '../../core/run/run-orchestrator.js';
 import { createRunRecord } from '../../core/run/run-state.js';
-import { ensureRunDir } from '../../storage/local-run-store.js';
-import { saveRunJson } from '../../storage/local-run-store.js';
+import { ensureRunDir, saveRunJson } from '../../storage/local-run-store.js';
 import type { RunContext, RunFlags } from '../../core/run/run-context.js';
 import { runVerificationPipeline } from '../../core/pipeline/verification-pipeline.js';
 import { buildAndSaveReport } from '../../core/reports/report-builder.js';
 import { runDir } from '../../storage/paths.js';
 import { join } from 'node:path';
+import { getOrCreateFingerprint } from '../../core/repository/repo-fingerprint.js';
+import { VerificationCache } from '../../core/cache/verification-cache.js';
+import { selectContext } from '../../core/context/context-selector.js';
+import { createProgress } from '../output/progress.js';
 
 export function buildVerifyCommand(): Command {
   return new Command('verify')
@@ -24,7 +27,10 @@ export function buildVerifyCommand(): Command {
         const cwd = process.cwd();
         const info = await getRepositoryInfo(cwd);
         const root = info.root;
-        const config = await loadConfig(root);
+        const [config, fingerprint] = await Promise.all([
+          loadConfig(root),
+          getOrCreateFingerprint(root, info.remote),
+        ]);
         const policy = await loadPolicy(root);
 
         const snapshot = await captureSnapshot(root, config.verification.maxFileBytes);
@@ -39,7 +45,9 @@ export function buildVerifyCommand(): Command {
         await ensureRunDir(root, runId);
 
         const record = createRunRecord({
-          runId, repositoryPath: root,
+          runId,
+          repoId: fingerprint.repoId,
+          repositoryPath: root,
           repositoryRemote: info.remote,
           branch: info.branch,
           baselineCommitSha: info.commitSha,
@@ -56,14 +64,31 @@ export function buildVerifyCommand(): Command {
           intent: options['intent'] as string | undefined,
         };
 
+        const selectedContext = await selectContext({
+          repoRoot: root,
+          diff,
+          maxDiffBytes: config.verification.maxDiffBytes,
+          maxFileBytes: config.verification.maxFileBytes,
+          maxTotalTokens: 60_000,
+          excludePatterns: config.privacy.excludePatterns,
+        });
+
         const context: RunContext = {
-          runId, repoRoot: root, config, policy,
+          runId,
+          repoRoot: root,
+          repoId: fingerprint.repoId,
+          config,
+          policy,
           wrappedCommand: ['crosscheck', 'verify'],
           intent: flags.intent,
           baselineSnapshot: snapshot,
           finalSnapshot: snapshot,
           diff,
-          record, flags,
+          selectedContext,
+          record,
+          flags,
+          cache: new VerificationCache(root),
+          progress: createProgress(flags.quiet || flags.json),
           abortSignal: new AbortController().signal,
         };
 

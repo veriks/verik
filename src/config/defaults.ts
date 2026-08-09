@@ -21,6 +21,8 @@ export const DEFAULT_CONFIG = {
     redactEnvironmentValues: true,
     excludePatterns: ['.env', '.env.*', '**/*.pem', '**/*.key', '**/credentials.*'],
   },
+  inferenceTimeoutMs: 120_000,
+  runsToKeep: 100,
 };
 
 export const DEFAULT_POLICY = {

@@ -1,10 +1,12 @@
-import type { VerificationStage } from '../../core/pipeline/stage.js';
+import type { VerificationStage, StageOutputWithMeta } from '../../core/pipeline/stage.js';
 import type { RunContext } from '../../core/run/run-context.js';
 import type { BuilderOutput, BuilderEvidence } from './builder-schema.js';
 import type { ScoutOutput } from '../scout/scout-schema.js';
 import { detectProject } from './project-detector.js';
 import { planCommands } from './command-planner.js';
 import { executeCommand } from './command-executor.js';
+import { VerificationCache } from '../../core/cache/verification-cache.js';
+import { sha256 } from '../../shared/hashing.js';
 
 export interface BuilderInput {
   context: RunContext;
@@ -19,21 +21,21 @@ export interface BuilderInput {
  * Scout's builderRecommendations are used for display context only.
  * The command planner always maps goals to allowlisted commands — LLM output
  * never reaches shell execution.
+ *
+ * Results are cached by (repoId + diff hash + command list). If the diff
+ * hasn't changed and the commands haven't changed, skip re-running.
  */
 export class BuilderStage implements VerificationStage<BuilderInput, BuilderOutput> {
   name = 'Builder';
 
-  async execute(input: BuilderInput, _context: RunContext): Promise<BuilderOutput> {
+  async execute(input: BuilderInput, _context: RunContext): Promise<StageOutputWithMeta<BuilderOutput>> {
     const { context } = input;
-    const { repoRoot, config } = context;
+    const { repoRoot, config, repoId } = context;
 
     if (!config.builder.enabled) {
       return {
-        projectTypes: [],
-        commands: [],
-        overallStatus: 'skipped',
-        evidence: [],
-        limitations: ['Builder disabled in config'],
+        output: { projectTypes: [], commands: [], overallStatus: 'skipped', evidence: [], limitations: ['Builder disabled in config'] },
+        meta: { fromCache: false },
       };
     }
 
@@ -43,15 +45,27 @@ export class BuilderStage implements VerificationStage<BuilderInput, BuilderOutp
 
     if (planned.length === 0) {
       return {
-        projectTypes: detection.projectTypes,
-        packageManager: detection.packageManager ?? undefined,
-        commands: [],
-        overallStatus: 'skipped',
-        evidence: [],
-        limitations: ['No runnable commands detected for this project type'],
+        output: {
+          projectTypes: detection.projectTypes,
+          packageManager: detection.packageManager ?? undefined,
+          commands: [],
+          overallStatus: 'skipped',
+          evidence: [],
+          limitations: ['No runnable commands detected for this project type'],
+        },
+        meta: { fromCache: false },
       };
     }
 
+    // Check verification cache
+    const diffHash = sha256(context.diff?.patch ?? '');
+    const cacheKey = VerificationCache.builderKey(repoId, diffHash, planned.map((p) => p.command));
+    const cached = await context.cache.get<BuilderOutput>(cacheKey, repoId);
+    if (cached) {
+      return { output: cached, meta: { fromCache: true } };
+    }
+
+    // Run commands
     const commandResults = [];
     for (let i = 0; i < planned.length; i++) {
       const result = await executeCommand(planned[i]!, repoRoot, config.builder.timeoutMs, i);
@@ -76,7 +90,7 @@ export class BuilderStage implements VerificationStage<BuilderInput, BuilderOutp
       : allPassed ? 'passed'
       : 'skipped';
 
-    return {
+    const output: BuilderOutput = {
       projectTypes: detection.projectTypes,
       packageManager: detection.packageManager ?? undefined,
       commands: commandResults,
@@ -84,5 +98,12 @@ export class BuilderStage implements VerificationStage<BuilderInput, BuilderOutp
       evidence,
       limitations: [],
     };
+
+    // Only cache passing or failed results — not errored/timed out
+    if (overallStatus === 'passed' || overallStatus === 'failed') {
+      await context.cache.set(cacheKey, repoId, output);
+    }
+
+    return { output, meta: { fromCache: false } };
   }
 }
