@@ -15,7 +15,8 @@
   "scripts": {
     "build":        "tsup",
     "build:bin":    "tsup --config tsup.binary.config.ts && node scripts/pkg-build.mjs",
-    "prepare":      "husky && npm run build",
+    "prepare":      "husky || true",
+    "prepack":      "npm run build",
     "dev":          "tsx src/cli/index.ts",
     "test":         "vitest run",
     "test:watch":   "vitest",
