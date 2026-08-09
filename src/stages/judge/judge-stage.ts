@@ -17,7 +17,10 @@ export interface JudgeInput {
 export class JudgeStage implements VerificationStage<JudgeInput, JudgeOutput> {
   name = 'Judge';
 
-  async execute(input: JudgeInput, _context: RunContext): Promise<StageOutputWithMeta<JudgeOutput>> {
+  async execute(
+    input: JudgeInput,
+    _context: RunContext,
+  ): Promise<StageOutputWithMeta<JudgeOutput>> {
     const { context, scout, builder, reviewer } = input;
 
     const provider = await this.getProvider(context);
@@ -31,7 +34,9 @@ export class JudgeStage implements VerificationStage<JudgeInput, JudgeOutput> {
       userContent: prompt.user,
       schema: JudgeOutputSchema,
       model: context.flags.modelJudge ?? context.config.models.judge,
-      maxOutputTokens: 4096,
+      // Opus 5 thinks by default and max_tokens caps thinking + response
+      // together — a tight budget truncates the verdict mid-sentence.
+      maxOutputTokens: 16_000,
       temperature: 0.05,
       promptVersion: JUDGE_PROMPT_VERSION,
       timeoutMs: context.config.inferenceTimeoutMs,

@@ -8,6 +8,7 @@ import type {
 import { ProviderError } from '../shared/errors.js';
 import { sha256 } from '../shared/hashing.js';
 import { logger } from '../shared/logger.js';
+import { DEFAULT_MODELS } from '../config/defaults.js';
 
 const TRANSIENT_ERROR_CODES = new Set(['ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN']);
 const MAX_RETRIES = 3;
@@ -204,10 +205,19 @@ export class AnthropicProvider implements LlmProvider {
     );
   }
 
+  /**
+   * Precedence: CROSSCHECK_MODEL_<STAGE> env var, then config.json, then the
+   * per-stage default.
+   *
+   * 'configured-through-environment' is a legacy placeholder written by older
+   * versions of `crosscheck init`; treat it as "unset" so existing config files
+   * keep working.
+   */
   private resolveModel(modelConfig: string, stage: string): string {
-    if (modelConfig !== 'configured-through-environment') return modelConfig;
-    const envKey = `CROSSCHECK_MODEL_${stage.toUpperCase()}`;
-    return process.env[envKey] ?? 'claude-sonnet-4-6';
+    const fromEnv = process.env[`CROSSCHECK_MODEL_${stage.toUpperCase()}`];
+    if (fromEnv) return fromEnv;
+    if (modelConfig && modelConfig !== 'configured-through-environment') return modelConfig;
+    return DEFAULT_MODELS[stage as keyof typeof DEFAULT_MODELS] ?? DEFAULT_MODELS.reviewer;
   }
 }
 
