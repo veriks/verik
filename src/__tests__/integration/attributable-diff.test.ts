@@ -1,5 +1,4 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { join } from 'node:path';
 import { createTestRepo, initWithCommit, type TestRepo } from '../helpers/test-repo.js';
 import { getRepositoryInfo } from '../../core/repository/git-repository.js';
 import { captureSnapshot } from '../../core/repository/repository-snapshot.js';

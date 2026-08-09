@@ -16,7 +16,7 @@ import { logger } from '../../shared/logger.js';
  *   "This file had a broken auth pattern three times before."
  */
 export async function recordRun(context: RunContext, pipeline: PipelineResult): Promise<void> {
-  const { repoRoot, record, diff } = context;
+  const { repoRoot, record } = context;
   const judge = pipeline.judge;
   const reviewer = pipeline.reviewer;
 
@@ -32,9 +32,9 @@ export async function recordRun(context: RunContext, pipeline: PipelineResult): 
       verdict: judge?.verdict,
       confidence: judge?.confidence,
       findingCount: reviewer?.findings.length ?? 0,
-      highSeverityCount: reviewer?.findings.filter(
-        (f) => f.severity === 'high' || f.severity === 'critical',
-      ).length ?? 0,
+      highSeverityCount:
+        reviewer?.findings.filter((f) => f.severity === 'high' || f.severity === 'critical')
+          .length ?? 0,
       builderStatus: pipeline.builder?.overallStatus,
     });
 

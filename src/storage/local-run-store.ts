@@ -1,5 +1,4 @@
 import { mkdir, writeFile, readFile, readdir } from 'node:fs/promises';
-import { join } from 'node:path';
 import { runDir, runFilePath, runsDir } from './paths.js';
 import { StorageError } from '../shared/errors.js';
 import type { RunRecord } from '../core/run/run-state.js';

@@ -4,39 +4,53 @@ import type { Finding } from '../../stages/reviewer/reviewer-schema.js';
 import type { BuilderCommandResult } from '../../stages/builder/builder-schema.js';
 
 const STATUS = {
-  block:        { color: '#ff4444', label: 'Block'        },
-  warn:         { color: '#f59e0b', label: 'Warning'      },
-  pass:         { color: '#22c55e', label: 'Pass'         },
+  block: { color: '#ff4444', label: 'Block' },
+  warn: { color: '#f59e0b', label: 'Warning' },
+  pass: { color: '#22c55e', label: 'Pass' },
   inconclusive: { color: '#737373', label: 'Inconclusive' },
 } as const;
 
 const SEV: Record<string, string> = {
-  critical: '#ff4444', high: '#ff4444',
-  medium: '#f59e0b', low: '#737373', info: '#3b82f6',
+  critical: '#ff4444',
+  high: '#ff4444',
+  medium: '#f59e0b',
+  low: '#737373',
+  info: '#3b82f6',
 };
 
-const e   = (s: string) => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const e = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const pct = (n: number) => `${Math.round(n * 100)}`;
-const dur = (ms: number) => ms >= 1000 ? `${(ms/1000).toFixed(1)}s` : `${ms}ms`;
+const dur = (ms: number) => (ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`);
 
 function renderDiff(patch: string): string {
-  const rows = patch.split('\n').slice(0, 500).map(line => {
-    if (line.startsWith('+++') || line.startsWith('---')) return `<div class="dl-meta">${e(line)}</div>`;
-    if (line.startsWith('@@'))  return `<div class="dl-hunk">${e(line)}</div>`;
-    if (line.startsWith('+'))   return `<div class="dl-add"><span>+</span>${e(line.slice(1))}</div>`;
-    if (line.startsWith('-'))   return `<div class="dl-del"><span>-</span>${e(line.slice(1))}</div>`;
-    return `<div class="dl-ctx"><span> </span>${e(line.slice(1))}</div>`;
-  }).join('');
+  const rows = patch
+    .split('\n')
+    .slice(0, 500)
+    .map((line) => {
+      if (line.startsWith('+++') || line.startsWith('---'))
+        return `<div class="dl-meta">${e(line)}</div>`;
+      if (line.startsWith('@@')) return `<div class="dl-hunk">${e(line)}</div>`;
+      if (line.startsWith('+'))
+        return `<div class="dl-add"><span>+</span>${e(line.slice(1))}</div>`;
+      if (line.startsWith('-'))
+        return `<div class="dl-del"><span>-</span>${e(line.slice(1))}</div>`;
+      return `<div class="dl-ctx"><span> </span>${e(line.slice(1))}</div>`;
+    })
+    .join('');
   return `<div class="diff-view">${rows}</div>`;
 }
 
 function renderFinding(f: Finding, idx: number): string {
-  const color  = SEV[f.severity] ?? '#737373';
+  const color = SEV[f.severity] ?? '#737373';
   const isHigh = f.severity === 'critical' || f.severity === 'high';
-  const evs = f.evidence.map(ev => {
-    const loc = ev.startLine ? `:${ev.startLine}${ev.endLine && ev.endLine !== ev.startLine ? `–${ev.endLine}` : ''}` : '';
-    return `<div class="ev"><div class="ev-file">${e(ev.path)}${loc}</div>${ev.excerpt ? `<pre class="ev-code">${e(ev.excerpt)}</pre>` : ''}<div class="ev-note">${e(ev.explanation)}</div></div>`;
-  }).join('');
+  const evs = f.evidence
+    .map((ev) => {
+      const loc = ev.startLine
+        ? `:${ev.startLine}${ev.endLine && ev.endLine !== ev.startLine ? `–${ev.endLine}` : ''}`
+        : '';
+      return `<div class="ev"><div class="ev-file">${e(ev.path)}${loc}</div>${ev.excerpt ? `<pre class="ev-code">${e(ev.excerpt)}</pre>` : ''}<div class="ev-note">${e(ev.explanation)}</div></div>`;
+    })
+    .join('');
   return `
 <details class="fi" ${isHigh && idx < 2 ? 'open' : ''}>
   <summary class="fi-row">
@@ -56,14 +70,15 @@ function renderFinding(f: Finding, idx: number): string {
 }
 
 function renderCmd(c: BuilderCommandResult): string {
-  const ok   = c.status === 'passed';
+  const ok = c.status === 'passed';
   const fail = c.status !== 'passed' && c.status !== 'skipped';
-  const col  = ok ? '#22c55e' : fail ? '#ff4444' : '#737373';
+  const col = ok ? '#22c55e' : fail ? '#ff4444' : '#737373';
   const tail = (c.stderrTail || c.stdoutTail).slice(0, 400);
-  return `<div class="cmd-row"><span style="color:${col};font-weight:700;width:12px">${ok?'✓':fail?'✗':'–'}</span><code class="cmd-c">${e(c.command)}</code><span class="cmd-d">${dur(c.durationMs)}</span></div>${fail && tail ? `<pre class="cmd-out">${e(tail)}</pre>` : ''}`;
+  return `<div class="cmd-row"><span style="color:${col};font-weight:700;width:12px">${ok ? '✓' : fail ? '✗' : '–'}</span><code class="cmd-c">${e(c.command)}</code><span class="cmd-d">${dur(c.durationMs)}</span></div>${fail && tail ? `<pre class="cmd-out">${e(tail)}</pre>` : ''}`;
 }
 
-function css(): string { return `
+function css(): string {
+  return `
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{font-size:13px;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
@@ -168,40 +183,44 @@ details[open] .acc-arr{transform:rotate(90deg)}
 
 /* footer */
 .footer{text-align:center;font-size:11px;color:#333;padding:24px 0;border-top:1px solid rgba(255,255,255,.04);margin-top:24px}
-`; }
+`;
+}
 
 export function renderHtmlReport(context: RunContext, pipeline: PipelineResult): string {
   const { record, diff } = context;
-  const { scout, builder, reviewer, judge, policy } = pipeline;
-  const verdict  = (judge?.verdict ?? 'inconclusive') as keyof typeof STATUS;
-  const tok      = STATUS[verdict] ?? STATUS.inconclusive;
+  const { scout, builder, reviewer, judge } = pipeline;
+  const verdict = (judge?.verdict ?? 'inconclusive') as keyof typeof STATUS;
+  const tok = STATUS[verdict] ?? STATUS.inconclusive;
   const findings = reviewer?.findings ?? [];
-  const high     = findings.filter(f => f.severity === 'critical' || f.severity === 'high').length;
-  const actions  = judge?.requiredActions ?? [];
+  const high = findings.filter((f) => f.severity === 'critical' || f.severity === 'high').length;
+  const actions = judge?.requiredActions ?? [];
 
   const chip = (k: string, v: string) =>
     `<div class="chip"><span class="chip-k">${k}</span><span class="chip-v">${e(v)}</span></div>`;
 
   const accArrow = `<svg class="acc-arr" viewBox="0 0 16 16"><path d="M6.22 3.22a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 010-1.06z" fill="currentColor"/></svg>`;
 
-  const scoutSec = scout ? `
+  const scoutSec = scout
+    ? `
 <details class="acc">
   <summary>
     Scout
-    <span class="acc-badge" style="color:${SEV[scout.riskLevel]??'#737373'};border-color:${SEV[scout.riskLevel]??'#737373'}20">${e(scout.riskLevel)} risk</span>
+    <span class="acc-badge" style="color:${SEV[scout.riskLevel] ?? '#737373'};border-color:${SEV[scout.riskLevel] ?? '#737373'}20">${e(scout.riskLevel)} risk</span>
     <span class="acc-dur">${dur(pipeline.stageMetadata.scout?.durationMs ?? 0)}</span>
     ${accArrow}
   </summary>
   <div class="acc-body">
     <p>${e(scout.changeSummary)}</p>
-    ${scout.affectedAreas.length ? `<div class="acc-tags">${scout.affectedAreas.map(a=>`<span class="acc-tag">${e(a)}</span>`).join('')}</div>` : ''}
-    ${scout.reviewFocus.length ? `<div class="acc-tags">${scout.reviewFocus.map(f=>`<span class="acc-tag acc-tag-blue">${e(f)}</span>`).join('')}</div>` : ''}
+    ${scout.affectedAreas.length ? `<div class="acc-tags">${scout.affectedAreas.map((a) => `<span class="acc-tag">${e(a)}</span>`).join('')}</div>` : ''}
+    ${scout.reviewFocus.length ? `<div class="acc-tags">${scout.reviewFocus.map((f) => `<span class="acc-tag acc-tag-blue">${e(f)}</span>`).join('')}</div>` : ''}
   </div>
-</details>` : '';
+</details>`
+    : '';
 
   const bStatus = builder?.overallStatus ?? 'skipped';
-  const bCol    = bStatus === 'passed' ? '#22c55e' : bStatus === 'failed' ? '#ff4444' : '#737373';
-  const builderSec = builder ? `
+  const bCol = bStatus === 'passed' ? '#22c55e' : bStatus === 'failed' ? '#ff4444' : '#737373';
+  const builderSec = builder
+    ? `
 <details class="acc">
   <summary>
     Builder
@@ -212,9 +231,11 @@ export function renderHtmlReport(context: RunContext, pipeline: PipelineResult):
   <div class="acc-body">
     ${builder.commands.length ? builder.commands.map(renderCmd).join('') : '<p style="color:#404040">No commands detected.</p>'}
   </div>
-</details>` : '';
+</details>`
+    : '';
 
-  const diffSec = diff?.patch ? `
+  const diffSec = diff?.patch
+    ? `
 <details class="acc">
   <summary>
     Diff
@@ -222,9 +243,16 @@ export function renderHtmlReport(context: RunContext, pipeline: PipelineResult):
     ${accArrow}
   </summary>
   ${renderDiff(diff.patch)}
-</details>` : '';
+</details>`
+    : '';
 
-  const ts = new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const ts = new Date().toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -265,20 +293,32 @@ export function renderHtmlReport(context: RunContext, pipeline: PipelineResult):
 
 <div class="page">
 
-  ${actions.length ? `<div class="actions">
+  ${
+    actions.length
+      ? `<div class="actions">
     <div class="actions-title">Required actions</div>
-    ${actions.map(a => `<div class="action"><span class="action-arr">→</span><span class="action-txt">${e(a)}</span></div>`).join('')}
-  </div>` : ''}
+    ${actions.map((a) => `<div class="action"><span class="action-arr">→</span><span class="action-txt">${e(a)}</span></div>`).join('')}
+  </div>`
+      : ''
+  }
 
-  ${findings.length ? `<div class="sec">
+  ${
+    findings.length
+      ? `<div class="sec">
     <div class="sec-label">Findings</div>
     ${findings.map((f, i) => renderFinding(f, i)).join('')}
-  </div>` : ''}
+  </div>`
+      : ''
+  }
 
-  ${scoutSec || builderSec || diffSec ? `<div class="sec">
+  ${
+    scoutSec || builderSec || diffSec
+      ? `<div class="sec">
     <div class="sec-label">Details</div>
     ${scoutSec}${builderSec}${diffSec}
-  </div>` : ''}
+  </div>`
+      : ''
+  }
 
   <div class="footer">Crosscheck · not a guarantee of correctness or security</div>
 </div>

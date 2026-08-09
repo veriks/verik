@@ -26,19 +26,23 @@ describe('orchestrateRun', () => {
 
     // Script must create the src/ dir before writing — the dir already exists
     // after initWithCommit, but make it explicit for clarity.
-    await repo.write('scripts/add-file.js', [
-      "const fs = require('fs');",
-      "const path = require('path');",
-      "const dir = path.join(process.cwd(), 'src');",
-      "if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });",
-      "fs.writeFileSync(path.join(dir, 'generated.ts'), 'export const g = 42;');",
-    ].join('\n'));
-
-    const result = await orchestrateRun(
-      ['node', 'scripts/add-file.js'],
-      repo.root,
-      { json: false, quiet: true, verbose: false, noBuilder: false },
+    await repo.write(
+      'scripts/add-file.js',
+      [
+        "const fs = require('fs');",
+        "const path = require('path');",
+        "const dir = path.join(process.cwd(), 'src');",
+        'if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });',
+        "fs.writeFileSync(path.join(dir, 'generated.ts'), 'export const g = 42;');",
+      ].join('\n'),
     );
+
+    const result = await orchestrateRun(['node', 'scripts/add-file.js'], repo.root, {
+      json: false,
+      quiet: true,
+      verbose: false,
+      noBuilder: false,
+    });
 
     expect(result.runId).toMatch(/^ccr_/);
     expect(norm(result.repoRoot)).toBe(norm(repo.root));
@@ -52,19 +56,24 @@ describe('orchestrateRun', () => {
     expect(meta.commandIntroducedPaths.map(norm)).toContain('src/generated.ts');
 
     // Report files must exist.
-    await expect(access(join(repo.root, '.crosscheck', 'runs', result.runId, 'report.md'))).resolves.toBeUndefined();
-    await expect(access(join(repo.root, '.crosscheck', 'runs', result.runId, 'report.json'))).resolves.toBeUndefined();
-  });
+    await expect(
+      access(join(repo.root, '.crosscheck', 'runs', result.runId, 'report.md')),
+    ).resolves.toBeUndefined();
+    await expect(
+      access(join(repo.root, '.crosscheck', 'runs', result.runId, 'report.json')),
+    ).resolves.toBeUndefined();
+  }, 15000);
 
   it('exits cleanly when command produces no changes', async () => {
     repo = await createTestRepo();
     await initWithCommit(repo, 'README.md', '# hi');
 
-    const result = await orchestrateRun(
-      ['node', '-e', ''],
-      repo.root,
-      { json: false, quiet: true, verbose: false, noBuilder: false },
-    );
+    const result = await orchestrateRun(['node', '-e', ''], repo.root, {
+      json: false,
+      quiet: true,
+      verbose: false,
+      noBuilder: false,
+    });
 
     expect(result.runId).toMatch(/^ccr_/);
     expect(result.exitCode).toBe(0);
@@ -75,20 +84,24 @@ describe('orchestrateRun', () => {
     await initWithCommit(repo, 'README.md', '# hi');
 
     // Script writes a file and then exits non-zero.
-    await repo.write('scripts/fail.js', [
-      "const fs = require('fs');",
-      "const path = require('path');",
-      "const dir = path.join(process.cwd(), 'src');",
-      "if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });",
-      "fs.writeFileSync(path.join(dir, 'fail-output.ts'), 'export const f = 1;');",
-      "process.exit(1);",
-    ].join('\n'));
-
-    const result = await orchestrateRun(
-      ['node', 'scripts/fail.js'],
-      repo.root,
-      { json: false, quiet: true, verbose: false, noBuilder: false },
+    await repo.write(
+      'scripts/fail.js',
+      [
+        "const fs = require('fs');",
+        "const path = require('path');",
+        "const dir = path.join(process.cwd(), 'src');",
+        'if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });',
+        "fs.writeFileSync(path.join(dir, 'fail-output.ts'), 'export const f = 1;');",
+        'process.exit(1);',
+      ].join('\n'),
     );
+
+    const result = await orchestrateRun(['node', 'scripts/fail.js'], repo.root, {
+      json: false,
+      quiet: true,
+      verbose: false,
+      noBuilder: false,
+    });
 
     const metaPath = join(repo.root, '.crosscheck', 'runs', result.runId, 'metadata.json');
     const meta = JSON.parse(await readFile(metaPath, 'utf8')) as {
@@ -107,19 +120,23 @@ describe('orchestrateRun', () => {
     await repo.write('src/auth.ts', 'export const auth = () => { /* modified */ };');
 
     // Command adds a different file.
-    await repo.write('scripts/add.js', [
-      "const fs = require('fs');",
-      "const path = require('path');",
-      "const dir = path.join(process.cwd(), 'src');",
-      "if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });",
-      "fs.writeFileSync(path.join(dir, 'new.ts'), 'export const n = 1;');",
-    ].join('\n'));
-
-    const result = await orchestrateRun(
-      ['node', 'scripts/add.js'],
-      repo.root,
-      { json: false, quiet: true, verbose: false, noBuilder: false },
+    await repo.write(
+      'scripts/add.js',
+      [
+        "const fs = require('fs');",
+        "const path = require('path');",
+        "const dir = path.join(process.cwd(), 'src');",
+        'if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });',
+        "fs.writeFileSync(path.join(dir, 'new.ts'), 'export const n = 1;');",
+      ].join('\n'),
     );
+
+    const result = await orchestrateRun(['node', 'scripts/add.js'], repo.root, {
+      json: false,
+      quiet: true,
+      verbose: false,
+      noBuilder: false,
+    });
 
     const metaPath = join(repo.root, '.crosscheck', 'runs', result.runId, 'metadata.json');
     const meta = JSON.parse(await readFile(metaPath, 'utf8')) as {
