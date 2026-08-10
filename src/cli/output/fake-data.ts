@@ -93,6 +93,7 @@ export function buildFakePipeline(): PipelineResult {
   const ts = (offsetMs: number) => new Date(now.getTime() - offsetMs).toISOString();
   return {
     deterministicFindings: [],
+    suppressedFindings: [],
     stageStatuses: {
       scout: 'completed',
       builder: 'completed',

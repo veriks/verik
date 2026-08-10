@@ -28,6 +28,7 @@ const SECRET_PATTERNS = [
 export class SecretLeakRule implements DeterministicRule {
   id = 'secret-leak';
   title = 'Likely secret added to diff';
+  defaultSeverity = 'critical' as const;
 
   async run(ctx: RuleContext): Promise<DeterministicFinding[]> {
     const findings: DeterministicFinding[] = [];

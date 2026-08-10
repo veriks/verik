@@ -63,6 +63,11 @@ export async function buildAndSaveReport(
     // rule output rather than model output, and they exist even when the
     // Reviewer stage failed entirely.
     deterministicFindings: pipeline.deterministicFindings,
+    // What a policy or an override took off the blocking path, and why. The
+    // run record is the artefact someone reads months later to answer "what did
+    // this check actually look at" — a silenced finding that left no trace
+    // there would make the answer wrong.
+    suppressedFindings: pipeline.suppressedFindings,
     evidence: evidence.items,
     policy: pipeline.policy,
     errors: pipeline.errors,

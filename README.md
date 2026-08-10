@@ -91,10 +91,32 @@ back exactly as it was. A single commit can always skip it with
 | `crosscheck verify` | Verify the current uncommitted diff (no command) |
 | `crosscheck begin` | Mark a baseline, for agents that can't be wrapped |
 | `crosscheck hook install` | Verify on every `git commit` |
+| `crosscheck rules` | List and tune the deterministic rules |
+| `crosscheck policy` | Show or change how strict verification is |
 | `crosscheck report [run-id]` | Print the latest (or specific) report |
 | `crosscheck explain [run-id]` | Explain the latest verdict in plain English |
 | `crosscheck status` | Show repository and Crosscheck status |
 | `crosscheck config` | Show the current configuration |
+
+## Tuning
+
+A rule too noisy for your codebase has two levers, and they are not equivalent:
+
+```sh
+crosscheck rules                                  # see all 23 and their severity
+crosscheck rules severity debug-artifact info     # keep it, stop it blocking
+crosscheck rules disable type-escape --reason "generated protobuf bindings"
+crosscheck policy mode advisory                   # report everything, block nothing
+```
+
+Reach for `severity` first — the finding stays in the report, it just stops
+crossing the blocking threshold, so no information is lost. `disable` requires a
+written reason, which is stored in `.crosscheck/policy.json` and therefore shows
+up in the pull request that turned the rule off.
+
+Even a disabled rule still runs. Its findings are recorded in the run record as
+suppressed, with the reason and who suppressed them, so switching a check off
+can never hide something without leaving a trace.
 
 ## Configuration
 

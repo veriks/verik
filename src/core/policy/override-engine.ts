@@ -8,6 +8,8 @@ export interface SuppressedFinding {
   title: string;
   overrideId: string;
   reason: string;
+  /** Which mechanism suppressed it. Defaults to a user-added override. */
+  source?: 'override' | 'policy';
 }
 
 function matchesDeterministic(finding: DeterministicFinding, override: Override): boolean {
@@ -53,7 +55,12 @@ export function applyOverridesToDeterministic(
     const match = overrides.find((o) => matchesDeterministic(finding, o));
     if (match) {
       logger.debug(`Override ${match.id} suppressed deterministic finding: ${finding.title}`);
-      suppressed.push({ type: 'deterministic', title: finding.title, overrideId: match.id, reason: match.reason });
+      suppressed.push({
+        type: 'deterministic',
+        title: finding.title,
+        overrideId: match.id,
+        reason: match.reason,
+      });
     } else {
       kept.push(finding);
     }
@@ -72,7 +79,12 @@ export function applyOverridesToLlmFindings(
     const match = overrides.find((o) => matchesLlm(finding, o));
     if (match) {
       logger.debug(`Override ${match.id} suppressed LLM finding: ${finding.title}`);
-      suppressed.push({ type: 'llm', title: finding.title, overrideId: match.id, reason: match.reason });
+      suppressed.push({
+        type: 'llm',
+        title: finding.title,
+        overrideId: match.id,
+        reason: match.reason,
+      });
     } else {
       kept.push(finding);
     }

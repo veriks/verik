@@ -22,6 +22,7 @@ import { isCiPath, isTestPath } from './file-kinds.js';
 export const CiWorkflowModifiedRule: DeterministicRule = {
   id: 'ci-workflow-modified',
   title: 'CI configuration changed',
+  defaultSeverity: 'medium',
   async run(ctx: RuleContext): Promise<DeterministicFinding[]> {
     return ctx.diff.changedFiles
       .filter((f) => isCiPath(f.path))
@@ -57,6 +58,7 @@ const ASSERTION =
 export const TestRemovalRule: DeterministicRule = {
   id: 'test-removal',
   title: 'Test coverage removed',
+  defaultSeverity: 'high',
   async run(ctx: RuleContext): Promise<DeterministicFinding[]> {
     const findings: DeterministicFinding[] = [];
 

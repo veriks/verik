@@ -140,6 +140,22 @@ export function printVerdictSummary(
 
   printStageRail(pipeline);
 
+  // A rule that was turned off must still leave a mark. Without this line the
+  // only way to know a finding was silenced is to read policy.json and infer
+  // it, which is exactly the silent failure the reason field exists to prevent.
+  if (pipeline.suppressedFindings?.length) {
+    const byPolicy = pipeline.suppressedFindings.filter((s) => s.source === 'policy').length;
+    const parts = [
+      byPolicy ? `${byPolicy} by policy` : '',
+      pipeline.suppressedFindings.length - byPolicy
+        ? `${pipeline.suppressedFindings.length - byPolicy} by override`
+        : '',
+    ].filter(Boolean);
+    console.log(
+      subtle(`  ${pipeline.suppressedFindings.length} finding(s) suppressed — ${parts.join(', ')}`),
+    );
+  }
+
   if (judge) {
     for (const line of box(
       judge.verdict.toUpperCase(),
