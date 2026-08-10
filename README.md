@@ -82,6 +82,10 @@ pre-commit — is preserved and still runs; `crosscheck hook uninstall` puts it
 back exactly as it was. A single commit can always skip it with
 `git commit --no-verify`.
 
+## Trying it on a real repo
+
+Step-by-step walkthrough, no API key needed: **[docs/quickstart.md](docs/quickstart.md)**
+
 ## Commands
 
 | Command | Description |
