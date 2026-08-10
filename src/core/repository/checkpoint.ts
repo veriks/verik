@@ -1,4 +1,5 @@
 import { readFile, writeFile, rm } from 'node:fs/promises';
+import { simpleGit } from 'simple-git';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { writeCheckpointTree } from './worktree-tree.js';
@@ -66,10 +67,63 @@ export async function clearCheckpoint(root: string): Promise<void> {
 }
 
 /**
- * A checkpoint taken on a different branch, or before a commit landed, is
- * describing a tree that no longer relates to what is in front of the user.
- * Diffing against it would attribute the branch switch to the agent.
+ * Whether a checkpoint still describes a meaningful comparison point.
+ *
+ * The first version treated *any* commit as invalidating — same branch, one
+ * commit later, discard. That is backwards. Agents commit: Claude Code commits,
+ * Aider commits by default, and the whole reason `begin` exists is to survive an
+ * agent working unattended. Throwing the baseline away the moment the agent uses
+ * it made the agent's work invisible, and `verify` reported "No changes to
+ * verify" over two commits of real changes.
+ *
+ * The checkpoint tree is a real git object in Crosscheck's own store; it does
+ * not stop being a valid diff target because HEAD moved forward. What genuinely
+ * breaks it is HEAD moving *sideways* — checking out unrelated history, where
+ * the diff would attribute someone else's commits to the agent.
+ *
+ * So the test is ancestry, not equality: if the checkpoint commit is an ancestor
+ * of HEAD, everything between them happened after `begin` and belongs in the
+ * diff. If it is not, the histories have diverged and the baseline is junk.
  */
-export function isStale(checkpoint: Checkpoint, branch: string, commitSha: string): boolean {
-  return checkpoint.branch !== branch || checkpoint.commitSha !== commitSha;
+export async function isStale(
+  root: string,
+  checkpoint: Checkpoint,
+  commitSha: string,
+): Promise<boolean> {
+  // Nothing has moved. No git call needed, and this is the common case.
+  if (checkpoint.commitSha === commitSha) return false;
+
+  // An unborn HEAD on either side has no ancestry to test. A checkpoint taken
+  // before the first commit stays valid until one lands.
+  if (!checkpoint.commitSha || !commitSha) return false;
+
+  // Ancestry is asked as a counting question rather than with
+  // `merge-base --is-ancestor`, which answers purely through its exit code and
+  // writes nothing to stdout — a shape simple-git does not reliably surface as
+  // a rejection, so the check silently answered "not stale" for every input.
+  //
+  // Commits reachable from the checkpoint but not from HEAD. Zero means HEAD
+  // already contains the checkpoint, i.e. it is an ancestor.
+  try {
+    const out = await simpleGit(root).raw([
+      'rev-list',
+      '--count',
+      `${commitSha}..${checkpoint.commitSha}`,
+    ]);
+    return Number(out.trim()) !== 0;
+  } catch {
+    // Unreadable history — the checkpoint commit may have been gc'd or rewritten.
+    return true;
+  }
+}
+
+/** How many commits have landed since the checkpoint, for reporting. */
+export async function commitsSince(root: string, checkpoint: Checkpoint): Promise<number> {
+  if (!checkpoint.commitSha) return 0;
+  try {
+    const out = await simpleGit(root).raw(['rev-list', '--count', `${checkpoint.commitSha}..HEAD`]);
+    return Number(out.trim()) || 0;
+  } catch {
+    return 0;
+  }
 }
