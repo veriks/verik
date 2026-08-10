@@ -31,33 +31,95 @@ export interface DeterministicRule {
   run(context: RuleContext): Promise<DeterministicFinding[]>;
 }
 
-export async function runDeterministicRules(context: RuleContext): Promise<DeterministicFinding[]> {
-  const { SecretLeakRule } = await import('./secret-leak.js');
-  const { EnvFileRule } = await import('./env-file.js');
-  const { EvalUsageRule } = await import('./eval-usage.js');
-  const { DisabledTestsRule } = await import('./disabled-tests.js');
-  const { EmptyCatchRule } = await import('./empty-catch.js');
-  const { DbMigrationRule } = await import('./db-migration.js');
-  const { LockfileChangedRule } = await import('./lockfile-changed.js');
+const SEVERITY_ORDER: Record<Severity, number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+  info: 4,
+};
 
-  const rules: DeterministicRule[] = [
-    new SecretLeakRule(),
-    new EnvFileRule(),
-    new EvalUsageRule(),
-    new DisabledTestsRule(),
-    new EmptyCatchRule(),
-    new DbMigrationRule(),
-    new LockfileChangedRule(),
+/**
+ * Ceiling on deterministic findings from a single run.
+ *
+ * Individual rules cap themselves, but twenty rules each contributing their
+ * maximum would still produce a report nobody reads — and an unreadable report
+ * is indistinguishable from no report. Findings are ordered by severity before
+ * the cut, so what survives truncation is the part worth acting on.
+ */
+const MAX_TOTAL_FINDINGS = 40;
+
+export async function loadRules(): Promise<DeterministicRule[]> {
+  const [secret, env, evalUse, disabled, emptyCatch, migration, lockfile, shortcuts, sec, repo] =
+    await Promise.all([
+      import('./secret-leak.js'),
+      import('./env-file.js'),
+      import('./eval-usage.js'),
+      import('./disabled-tests.js'),
+      import('./empty-catch.js'),
+      import('./db-migration.js'),
+      import('./lockfile-changed.js'),
+      import('./agent-shortcuts.js'),
+      import('./security-patterns.js'),
+      import('./repo-integrity.js'),
+    ]);
+
+  return [
+    // Leaked credentials first: the only finding class that stays dangerous
+    // after the change is reverted.
+    new secret.SecretLeakRule(),
+    new env.EnvFileRule(),
+
+    // Unsafe shortcuts.
+    sec.InsecureTransportRule,
+    sec.WeakCryptoRule,
+    sec.SqlInjectionRule,
+    sec.CommandInjectionRule,
+    sec.PermissiveAccessRule,
+    evalUse.EvalUsageRule,
+
+    // Work reported as done that is not done.
+    shortcuts.StubImplementationRule,
+    shortcuts.SuppressionAddedRule,
+    shortcuts.SwallowedErrorRule,
+    new emptyCatch.EmptyCatchRule(),
+    shortcuts.TypeEscapeRule,
+    shortcuts.DebugArtifactRule,
+
+    // Changes to the machinery that decides whether the change passes.
+    repo.TestRemovalRule,
+    repo.TautologicalAssertionRule,
+    disabled.DisabledTestsRule,
+    repo.AuthCheckRemovedRule,
+    repo.CiWorkflowModifiedRule,
+    repo.GitignoreWeakenedRule,
+    repo.RiskyDependencySourceRule,
+
+    // Context worth surfacing, not problems in themselves.
+    new migration.DbMigrationRule(),
+    new lockfile.LockfileChangedRule(),
   ];
+}
 
-  const allFindings: DeterministicFinding[] = [];
-  for (const rule of rules) {
-    try {
-      const findings = await rule.run(context);
-      allFindings.push(...findings);
-    } catch {
-      // rules must not crash the pipeline
-    }
-  }
-  return allFindings;
+export async function runDeterministicRules(context: RuleContext): Promise<DeterministicFinding[]> {
+  const rules = await loadRules();
+
+  // Rules are independent and none of them touch the network or the disk, so
+  // a failure in one must not lose the results of the others.
+  const results = await Promise.all(
+    rules.map(async (rule) => {
+      try {
+        return await rule.run(context);
+      } catch {
+        // A rule must never crash the pipeline. Its findings are lost; every
+        // other rule's are not.
+        return [];
+      }
+    }),
+  );
+
+  return results
+    .flat()
+    .sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity])
+    .slice(0, MAX_TOTAL_FINDINGS);
 }

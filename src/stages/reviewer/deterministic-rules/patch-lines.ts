@@ -18,37 +18,92 @@ export interface AddedLine {
   raw: string;
 }
 
-const HUNK = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/;
+/** A line on either side of the diff, with both line numbers resolved. */
+export interface PatchLine {
+  path: string;
+  kind: 'add' | 'del' | 'ctx';
+  /** 1-based line number on the new side; 0 for deletions. */
+  newLine: number;
+  /** 1-based line number on the old side; 0 for additions. */
+  oldLine: number;
+  text: string;
+  raw: string;
+}
 
-export function* iterateAddedLines(patch: string): Generator<AddedLine> {
-  let path = '';
-  let lineNo = 0;
+const HUNK = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/;
+
+/**
+ * Single pass over a unified diff, tracking both side's line numbers.
+ *
+ * Rules that detect *removal* — a deleted assertion, a dropped auth check, a
+ * weakened .gitignore — need the old side, which an added-lines-only walk
+ * cannot give them. Both public iterators are filters over this one so the
+ * hunk-header arithmetic exists in exactly one place.
+ */
+export function* iteratePatchLines(patch: string): Generator<PatchLine> {
+  let newPath = '';
+  let oldPath = '';
+  let newNo = 0;
+  let oldNo = 0;
 
   for (const raw of patch.split('\n')) {
-    // `+++ b/path` is the authoritative new-side path. Checked before the
-    // added-line branch, since it also starts with '+'.
+    // The file headers also start with '+'/'-', so they are matched first.
     if (raw.startsWith('+++ ')) {
       const p = raw.slice(4).trim();
-      path = p === '/dev/null' ? '' : p.replace(/^b\//, '');
+      newPath = p === '/dev/null' ? '' : p.replace(/^b\//, '');
       continue;
     }
-    if (raw.startsWith('--- ') || raw.startsWith('diff --git ') || raw.startsWith('index ')) {
+    if (raw.startsWith('--- ')) {
+      const p = raw.slice(4).trim();
+      oldPath = p === '/dev/null' ? '' : p.replace(/^a\//, '');
       continue;
     }
+    if (raw.startsWith('diff --git ') || raw.startsWith('index ')) continue;
 
     const hunk = HUNK.exec(raw);
     if (hunk) {
-      lineNo = Number(hunk[1]);
+      oldNo = Number(hunk[1]);
+      newNo = Number(hunk[2]);
       continue;
     }
 
     if (raw.startsWith('+')) {
-      yield { path, line: lineNo, text: raw.slice(1), raw };
-      lineNo++;
+      yield { path: newPath, kind: 'add', newLine: newNo, oldLine: 0, text: raw.slice(1), raw };
+      newNo++;
       continue;
     }
-    // Context lines advance the new-side counter; removals do not exist on it.
-    if (raw.startsWith(' ')) lineNo++;
+    if (raw.startsWith('-')) {
+      // For a deleted file the new-side path is /dev/null, so fall back to the
+      // old path — otherwise every finding in a deletion reports no file.
+      yield {
+        path: newPath || oldPath,
+        kind: 'del',
+        newLine: 0,
+        oldLine: oldNo,
+        text: raw.slice(1),
+        raw,
+      };
+      oldNo++;
+      continue;
+    }
+    if (raw.startsWith(' ')) {
+      yield { path: newPath, kind: 'ctx', newLine: newNo, oldLine: oldNo, text: raw.slice(1), raw };
+      newNo++;
+      oldNo++;
+    }
+  }
+}
+
+export function* iterateAddedLines(patch: string): Generator<AddedLine> {
+  for (const l of iteratePatchLines(patch)) {
+    if (l.kind === 'add') yield { path: l.path, line: l.newLine, text: l.text, raw: l.raw };
+  }
+}
+
+/** Lines the change removed, numbered against the file as it was before. */
+export function* iterateRemovedLines(patch: string): Generator<AddedLine> {
+  for (const l of iteratePatchLines(patch)) {
+    if (l.kind === 'del') yield { path: l.path, line: l.oldLine, text: l.text, raw: l.raw };
   }
 }
 
