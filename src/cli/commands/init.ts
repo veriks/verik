@@ -5,29 +5,50 @@ import { getRepositoryInfo } from '../../core/repository/git-repository.js';
 import { CrosscheckError } from '../../shared/errors.js';
 import { DEFAULT_CONFIG, DEFAULT_POLICY, DEFAULT_MODELS } from '../../config/defaults.js';
 import { getOrCreateFingerprint } from '../../core/repository/repo-fingerprint.js';
-import { PROVIDERS, resolveApiKey, type ProviderId } from '../../inference/providers.js';
-import { ask, isInteractive, select } from '../output/prompt.js';
-import { banner, brand, kv, muted, pass, section, subtle, warn } from '../output/theme.js';
+import {
+  PROVIDERS,
+  PROVIDER_IDS,
+  resolveApiKey,
+  type ProviderId,
+} from '../../inference/providers.js';
+import { PromptCancelled } from '../output/keypress.js';
+import { ask, checklist, isInteractive, reveal, select, stepHeader } from '../output/prompt.js';
+import { detectProject } from '../../stages/builder/project-detector.js';
+import { planCommands } from '../../stages/builder/command-planner.js';
+import { banner, brand, card, mark, muted, pass, section, subtle, warn } from '../output/theme.js';
 
 type Mode = 'rules' | 'full';
+
 interface StageModels {
   scout: string;
   reviewer: string;
   judge: string;
 }
 
+interface Setup {
+  mode: Mode;
+  provider: ProviderId;
+  baseUrl?: string;
+  models: StageModels;
+}
+
 /**
  * Onboarding.
  *
- * The point of asking rather than assuming: the deterministic rules and the
- * Builder need no API key at all, so a user without one still has a working
- * product. Previously that user got a config demanding a key, then a run where
- * every stage failed — the worst possible first impression of something that
- * does in fact work.
+ * Two principles drive the shape of this.
+ *
+ * First, `rules` mode is a real product, not a consolation prize: the
+ * deterministic rules and the Builder are plain code and need no API key, so a
+ * user without one still gets working verification. It is presented as a peer of
+ * the full pipeline, not a fallback.
+ *
+ * Second, ask as little as possible. Anything detectable from the environment is
+ * detected and shown as a badge rather than asked about, so the common path is
+ * two keypresses.
  */
 export function buildInitCommand(): Command {
   return new Command('init')
-    .description('Initialize Crosscheck in the current repository')
+    .description('Set up Crosscheck in the current repository')
     .option('-y, --yes', 'Accept defaults without prompting (for CI and scripts)')
     .option('--provider <id>', 'Inference provider (skips the prompt)')
     .option('--mode <mode>', 'rules | full')
@@ -35,45 +56,54 @@ export function buildInitCommand(): Command {
       try {
         const info = await getRepositoryInfo(process.cwd());
         const ccDir = join(info.root, '.crosscheck');
-
         const interactive = isInteractive() && !options.yes;
-        if (interactive) console.log(banner());
 
-        const mode = await chooseMode(options, interactive);
-        const { provider, baseUrl, models } = await chooseProvider(options, mode, interactive);
+        if (interactive) console.log(banner());
+        // Printed even under --yes: what was detected is information, and a CI
+        // log showing "no build commands found" explains a later empty Builder
+        // stage far better than silence does.
+        await printDetected(info.root, info.branch, info.isDirty);
+
+        const setup = await collectSetup(options, interactive);
 
         await mkdir(join(ccDir, 'runs'), { recursive: true });
         await mkdir(join(ccDir, 'cache'), { recursive: true });
 
         const config = {
           ...DEFAULT_CONFIG,
-          provider,
-          mode,
-          ...(baseUrl ? { baseUrl } : {}),
-          models,
+          provider: setup.provider,
+          mode: setup.mode,
+          ...(setup.baseUrl ? { baseUrl: setup.baseUrl } : {}),
+          models: setup.models,
         };
 
-        const configPath = join(ccDir, 'config.json');
-        const policyPath = join(ccDir, 'policy.json');
-        await writeFile(configPath, JSON.stringify(config, null, 2), 'utf8');
-        await writeFile(policyPath, JSON.stringify(DEFAULT_POLICY, null, 2), 'utf8');
+        await writeFile(join(ccDir, 'config.json'), JSON.stringify(config, null, 2), 'utf8');
+        await writeFile(
+          join(ccDir, 'policy.json'),
+          JSON.stringify(DEFAULT_POLICY, null, 2),
+          'utf8',
+        );
         await writeFile(join(ccDir, '.gitignore'), 'runs/\ncache/\n', 'utf8');
 
         // Create a stable repo fingerprint immediately so memory is scoped
         // correctly from the very first run, not only after the first LLM call.
         const fingerprint = await getOrCreateFingerprint(info.root, info.remote);
 
-        console.log(`\n${pass('✓')} Crosscheck initialized.\n`);
-        console.log(kv('config', configPath));
-        console.log(kv('policy', policyPath));
-        console.log(kv('repo id', fingerprint.repoId));
-        console.log(
-          kv('mode', mode === 'rules' ? 'rules only (no API key needed)' : 'full pipeline'),
+        console.log(`\n  ${section('written')}`);
+        await reveal(
+          checklist([
+            { label: 'config', detail: '.crosscheck/config.json' },
+            { label: 'policy', detail: `.crosscheck/policy.json · ${DEFAULT_POLICY.mode}` },
+            { label: 'repo id', detail: fingerprint.repoId },
+          ]),
         );
-        console.log(kv('provider', PROVIDERS[provider].label));
 
-        printNextSteps(mode, provider);
+        await printSummary(setup);
       } catch (err) {
+        if (err instanceof PromptCancelled) {
+          console.log(subtle('\n  Cancelled. Nothing was written.\n'));
+          process.exit(130);
+        }
         if (err instanceof CrosscheckError) {
           console.error('Error:', err.message);
           process.exit(err.exitCode);
@@ -84,110 +114,187 @@ export function buildInitCommand(): Command {
     });
 }
 
-async function chooseMode(options: { mode?: string }, interactive: boolean): Promise<Mode> {
-  if (options.mode === 'rules' || options.mode === 'full') return options.mode;
-  if (!interactive) return 'full';
+/**
+ * Reports what was actually determined about this repository.
+ *
+ * This is the same detection the Builder performs at run time, so it doubles as
+ * a preview: the commands listed here are literally the ones a run would
+ * execute. That makes it worth reading rather than decoration — and if it says
+ * "no build commands found", that is a genuine finding the user should see now
+ * rather than discover on their first run.
+ */
+async function printDetected(root: string, branch: string, dirty: boolean): Promise<void> {
+  const project = detectProject(root);
+  const planned = planCommands(project, []);
 
-  return select<Mode>(
-    `${section('how much should crosscheck do?')}`,
-    [
+  const stack = [project.projectTypes.join(', '), project.packageManager]
+    .filter(Boolean)
+    .join(' · ');
+
+  const withKey = PROVIDER_IDS.map((id) => PROVIDERS[id]).find(
+    (spec) => !spec.keyOptional && resolveApiKey(spec),
+  );
+
+  console.log(`  ${section('detected')}`);
+  await reveal(
+    checklist([
+      { label: 'branch', detail: `${branch}${dirty ? subtle(' · uncommitted') : ''}` },
       {
-        value: 'full',
-        label: 'Full pipeline — Scout, Builder, Reviewer, Judge',
-        hint: 'Needs an API key. Roughly $0.15–0.60 per run depending on diff size and models.',
+        label: 'project',
+        detail: stack || 'generic',
+        state: project.projectTypes.includes('generic') ? 'none' : 'ok',
       },
       {
-        value: 'rules',
-        label: 'Rules only — deterministic checks and your build/test/lint',
-        hint: 'No API key, no network, nothing leaves your machine. Free forever.',
+        label: 'commands',
+        detail: planned.length
+          ? planned.map((p) => p.command).join(' · ')
+          : 'none found — the Builder stage will be skipped',
+        state: planned.length ? 'ok' : 'none',
       },
-    ],
-    0,
+      {
+        label: 'api key',
+        detail: withKey ? `${withKey.apiKeyEnv} detected` : 'none in environment',
+        state: withKey ? 'ok' : 'none',
+      },
+    ]),
   );
 }
 
-async function chooseProvider(
-  options: { provider?: string },
-  mode: Mode,
+async function collectSetup(
+  options: { provider?: string; mode?: string },
   interactive: boolean,
-): Promise<{ provider: ProviderId; baseUrl?: string; models: StageModels }> {
-  const fallback: { provider: ProviderId; models: StageModels } = {
-    provider: 'anthropic',
-    models: { ...DEFAULT_MODELS },
-  };
+): Promise<Setup> {
+  const flagMode = options.mode === 'rules' || options.mode === 'full' ? options.mode : undefined;
+  const flagProvider =
+    options.provider && options.provider in PROVIDERS
+      ? (options.provider as ProviderId)
+      : undefined;
 
-  if (options.provider && options.provider in PROVIDERS) {
-    return { ...fallback, provider: options.provider as ProviderId };
+  if (!interactive || (flagMode && (flagMode === 'rules' || flagProvider))) {
+    return {
+      mode: flagMode ?? 'full',
+      provider: flagProvider ?? 'anthropic',
+      models: { ...DEFAULT_MODELS },
+    };
   }
-  // Rules mode makes no inference calls, so the provider is irrelevant until
-  // the user switches to full — don't make them answer a question that has no
-  // effect on anything they are about to do.
-  if (mode === 'rules' || !interactive) return fallback;
 
-  const provider = await select<ProviderId>(
-    `${section('which provider?')}`,
-    [
-      {
-        value: 'anthropic',
-        label: 'Anthropic',
-        hint: 'Claude. Tiered defaults already configured.',
-      },
-      { value: 'openai', label: 'OpenAI' },
-      { value: 'openrouter', label: 'OpenRouter', hint: 'One key, many models from many vendors.' },
-      { value: 'google', label: 'Google (Gemini)' },
-      {
-        value: 'ollama',
-        label: 'Ollama (local)',
-        hint: 'Runs on your machine. No key, no data leaves it.',
-      },
-      {
-        value: 'custom',
-        label: 'Something else',
-        hint: 'Any OpenAI-compatible endpoint — Mistral, DeepSeek, Groq, Together, Fireworks, Hugging Face.',
-      },
-    ],
-    0,
-  );
+  // Rules mode asks one question; full asks two. Showing "of 2" and then
+  // stopping at 1 would read as a bug, so the total is decided after the first
+  // answer and only rendered from step 2 onwards.
+  const mode =
+    flagMode ??
+    (await select<Mode>({
+      header: stepHeader(mark(), 1, 2),
+      question: 'How much should Crosscheck do?',
+      choices: [
+        {
+          value: 'full',
+          label: 'Full pipeline',
+          hint: 'Scout · Builder · Reviewer · Judge — needs an API key, roughly $0.15–0.60 a run',
+        },
+        {
+          value: 'rules',
+          label: 'Rules only',
+          hint: 'Deterministic checks and your build/test/lint — no key, nothing leaves your machine',
+        },
+      ],
+    }));
+
+  if (mode === 'rules') {
+    return { mode, provider: 'anthropic', models: { ...DEFAULT_MODELS } };
+  }
+
+  const provider =
+    flagProvider ??
+    (await select<ProviderId>({
+      header: stepHeader(mark(), 2, 2),
+      question: 'Which provider?',
+      choices: (
+        [
+          ['anthropic', 'Anthropic', 'Claude — tiered defaults already configured'],
+          ['openai', 'OpenAI', ''],
+          ['openrouter', 'OpenRouter', 'One key, models from every vendor'],
+          ['google', 'Google', 'Gemini'],
+          ['ollama', 'Ollama', 'Local. No key, nothing leaves your machine'],
+          [
+            'custom',
+            'Something else',
+            'Any OpenAI-compatible endpoint — Mistral, DeepSeek, Groq, Together, Fireworks, Hugging Face',
+          ],
+        ] as const
+      ).map(([value, label, hint]) => ({
+        value: value as ProviderId,
+        label,
+        hint: hint || undefined,
+        // Detected rather than asked: if the key is already exported, say so.
+        badge: resolveApiKey(PROVIDERS[value as ProviderId]) ? 'key detected' : undefined,
+      })),
+    }));
 
   const spec = PROVIDERS[provider];
-  let baseUrl: string | undefined;
-  if (provider === 'custom') {
-    baseUrl = await ask('  Base URL (OpenAI-compatible)', 'https://');
-  }
+  const baseUrl =
+    provider === 'custom'
+      ? await ask('Base URL', 'https://', 'An OpenAI-compatible /chat/completions endpoint.')
+      : undefined;
 
-  // Anthropic ships with verified tiered defaults; for anything else the model
-  // ids differ per host and change often, so ask rather than guess — a wrong
-  // default only surfaces as a confusing 404 on the first real run.
+  // Anthropic ships verified tiered defaults. For anything else the ids differ
+  // per host and change often, so ask rather than guess — a wrong default only
+  // surfaces as a confusing 404 on the first real request.
   let models: StageModels = { ...DEFAULT_MODELS };
   if (provider !== 'anthropic') {
-    if (spec.exampleModels) console.log(subtle(`\n  ${spec.exampleModels}`));
-    const one = await ask('  Model to use for all three stages', '');
-    if (one) models = { scout: one, reviewer: one, judge: one };
+    const model = await ask('Model id', '', spec.exampleModels ?? 'Used for all three stages.');
+    if (model) models = { scout: model, reviewer: model, judge: model };
   }
 
-  return { provider, baseUrl, models };
+  return { mode, provider, baseUrl, models };
 }
 
-function printNextSteps(mode: Mode, provider: ProviderId): void {
-  const spec = PROVIDERS[provider];
-  console.log(`\n${section('next')}`);
+async function printSummary(setup: Setup): Promise<void> {
+  const spec = PROVIDERS[setup.provider];
+  const hasKey = Boolean(resolveApiKey(spec));
+  const ready = setup.mode === 'rules' || hasKey || spec.keyOptional;
 
-  if (mode === 'full') {
-    const key = resolveApiKey(spec);
-    if (key) {
-      console.log(`  ${pass('✓')} ${spec.apiKeyEnv} is set`);
-    } else if (!spec.keyOptional) {
-      console.log(`  ${warn('!')} ${spec.apiKeyEnv} is not set — LLM stages will not run`);
-      console.log(subtle(`    export ${spec.apiKeyEnv}=...   (${spec.docs})`));
-    }
+  // The settings, not a sentence about them. The answered questions used to be
+  // left on screen as loose ✓ lines that looked identical to the detection
+  // checklist — three different kinds of thing rendered the same way. They
+  // collapse in here instead, where they read as configuration.
+  const rows: Array<[string, string]> = [
+    ['mode', setup.mode === 'rules' ? 'rules only' : 'full pipeline'],
+  ];
+
+  if (setup.mode === 'rules') {
+    rows.push(['runs', 'deterministic rules · your build, test and lint']);
+    rows.push(['network', pass('none — nothing leaves this machine')]);
   } else {
-    console.log(subtle('  Rules mode needs no key. Switch to the full pipeline any time with:'));
-    console.log(`    ${brand('crosscheck init --mode full')}`);
+    rows.push(['provider', spec.label]);
+    rows.push([
+      'models',
+      setup.models.scout === setup.models.judge
+        ? setup.models.scout
+        : `${setup.models.scout} · ${setup.models.reviewer} · ${setup.models.judge}`,
+    ]);
+    rows.push([
+      'api key',
+      hasKey ? pass(`${spec.apiKeyEnv} set`) : warn(`${spec.apiKeyEnv} not set`),
+    ]);
   }
 
-  console.log(
-    `\n  ${brand('crosscheck verify')}${muted('               check your uncommitted changes')}`,
+  console.log();
+  await reveal(card('READY', rows, ready ? pass : warn), 30);
+
+  if (setup.mode === 'full' && !hasKey && !spec.keyOptional) {
+    console.log(`\n  ${warn('!')} ${subtle(`export ${spec.apiKeyEnv}=...`)}`);
+    console.log(`    ${subtle(spec.docs)}`);
+  }
+
+  console.log(`\n  ${section('try')}`);
+  await reveal(
+    [
+      `  ${brand('crosscheck verify')}${muted('          check your uncommitted changes')}`,
+      `  ${brand('crosscheck run -- <cmd>')}${muted('    wrap a coding agent')}`,
+      `  ${brand('crosscheck demo')}${muted('            see a full fake run')}`,
+    ],
+    40,
   );
-  console.log(`  ${brand('crosscheck run -- <command>')}${muted('     wrap a coding agent')}`);
-  console.log(`  ${brand('crosscheck demo')}${muted('                 see a full fake run')}\n`);
+  console.log();
 }

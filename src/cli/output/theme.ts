@@ -34,8 +34,17 @@ export const subtle = paint(chalk.hex(palette.subtle));
 export const bold = paint(chalk.bold);
 export const underline = paint(chalk.underline);
 
-/** The mark: a check and a cross — the two things the tool decides between. */
-export const mark = (): string => `${pass('✓')}${block('✕')}`;
+/**
+ * The mark: a check and a cross — the two things the tool decides between.
+ *
+ * The space between them is load-bearing. Both glyphs are full-width in most
+ * monospace fonts, so set adjacent they visually collide into one smudge.
+ *
+ * MARK_RAW is the uncoloured form; anything aligning a column must measure with
+ * it, since the coloured version carries escape codes that have no width.
+ */
+export const MARK_RAW = '✓ ✕';
+export const mark = (): string => `${pass('✓')} ${block('✕')}`;
 
 export const wordmark = (): string => `${mark()}  ${bold('crosscheck')}`;
 
@@ -91,28 +100,20 @@ export function box(title: string, body: string, tint: (s: string) => string): s
 }
 
 /**
- * Three-row wordmark. Each glyph is 2–3 columns joined by a single space —
- * tight kerning makes adjacent letters merge and become unreadable.
+ * Wordmark banner — the brand moment on `crosscheck` with no arguments.
+ *
+ * Deliberately not ASCII art. A box-drawing letterform depends on the terminal
+ * font rendering ┌ ┬ ┴ ┘ at consistent widths with no gaps; in most default
+ * fonts, including Windows Terminal's, the strokes break apart and the word
+ * becomes unreadable. A typeset lockup carries the identity through colour and
+ * the mark instead, and renders identically everywhere.
  */
-const GLYPHS: Record<string, [string, string, string]> = {
-  c: ['┌─', '│ ', '└─'],
-  r: ['┬─┐', '├┬┘', '┴└─'],
-  o: ['┌─┐', '│ │', '└─┘'],
-  s: ['┌─┐', '└─┐', '└─┘'],
-  h: ['┬ ┬', '├─┤', '┴ ┴'],
-  e: ['┌─┐', '├┤ ', '└─┘'],
-  k: ['┬┌─', '├┴┐', '┴ ┴'],
-};
-
-/** Full wordmark banner — the brand moment on `crosscheck` with no arguments. */
 export function banner(): string {
-  const letters = [...'crosscheck'];
-  const rows = [0, 1, 2].map((r) => '  ' + letters.map((ch) => GLYPHS[ch]![r]).join(' '));
   return [
     '',
-    ...rows.map((r) => brand(r)),
+    `  ${mark()}   ${bold(brand('crosscheck'))}`,
+    `  ${' '.repeat(MARK_RAW.length)}   ${muted('independent verification for AI-generated code')}`,
     '',
-    `  ${mark()}  ${muted('independent verification for AI-generated code')}`,
   ].join('\n');
 }
 
@@ -127,6 +128,39 @@ export function section(title: string): string {
  */
 export function kv(label: string, value: string, width = 12): string {
   return `  ${muted(label.padEnd(width))}${value}`;
+}
+
+/**
+ * A titled card of label/value rows.
+ *
+ * `box()` wraps one blob of prose; this is for structured settings, where the
+ * values should line up in a column so the card can be read down rather than
+ * across. Padding is computed on the raw strings — the coloured versions carry
+ * escape codes with no display width.
+ */
+export function card(
+  title: string,
+  rows: Array<[label: string, value: string]>,
+  tint: (s: string) => string = brand,
+  labelWidth = 12,
+): string[] {
+  const w = frameWidth();
+  const head = `─ ${title} `;
+  const out = [tint(`╭${head}${'─'.repeat(Math.max(0, w - 2 - head.length))}╮`)];
+
+  for (const [label, value] of rows) {
+    const raw = `  ${label.padEnd(labelWidth)}${stripAnsi(value)}`;
+    const painted = `  ${muted(label.padEnd(labelWidth))}${value}`;
+    out.push(`${tint('│')}${painted}${' '.repeat(Math.max(0, w - 2 - raw.length))}${tint('│')}`);
+  }
+
+  out.push(tint(`╰${'─'.repeat(w - 2)}╯`));
+  return out;
+}
+
+/** Measures display width by removing SGR escape sequences first. */
+export function stripAnsi(s: string): string {
+  return s.replace(/\[[0-9;]*m/g, '');
 }
 
 /** Full-width rule, optionally labelled. */
