@@ -20,6 +20,7 @@
     "prepack":      "npm run build",
     "dev":          "tsx src/cli/index.ts",
     "test":         "vitest run",
+    "eval":         "node scripts/evaluate.mjs",
     "test:watch":   "vitest",
     "lint":         "eslint src --ext .ts",
     "typecheck":    "tsc --noEmit",

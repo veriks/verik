@@ -150,6 +150,20 @@ export function printVerdictSummary(
     console.log();
   }
 
+  // Rule output first and labelled: these are facts, not model opinion, and
+  // they are present even when the Reviewer stage failed.
+  if (pipeline.deterministicFindings.length) {
+    console.log(muted('RULES'));
+    for (const f of pipeline.deterministicFindings) {
+      const tint = severityTint(f.severity);
+      console.log(`${tint('▊')} ${tint(f.severity.toUpperCase().padEnd(8))}${f.title}`);
+      console.log(
+        `${tint('▊')} ${' '.repeat(8)}${subtle(f.file + (f.line ? `:${f.line}` : ''))} ${subtle(`· ${f.ruleId}`)}`,
+      );
+    }
+    console.log();
+  }
+
   if (reviewer) printFindings(reviewer.findings);
 
   // The Judge dismissing Reviewer findings is a deliberate design property —

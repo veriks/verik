@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import chalk from 'chalk';
+import { bold, subtle, verdictTint } from '../output/theme.js';
 import { getRepositoryInfo } from '../../core/repository/git-repository.js';
 import { listRunIds } from '../../storage/local-run-store.js';
 import { loadRunRecord } from '../../storage/local-run-store.js';
@@ -7,15 +7,10 @@ import { runFilePath } from '../../storage/paths.js';
 import { readFile } from 'node:fs/promises';
 import type { JudgeOutput } from '../../stages/judge/judge-schema.js';
 
-const c = () => process.stdout.isTTY && !process.env['NO_COLOR'];
-
+// Shared palette, so a verdict is the same colour here, in a run summary, and
+// in the HTML report.
 function verdictColor(verdict: string): string {
-  if (!c()) return verdict.toUpperCase();
-  if (verdict === 'block')       return chalk.red.bold(verdict.toUpperCase());
-  if (verdict === 'warn')        return chalk.yellow.bold(verdict.toUpperCase());
-  if (verdict === 'pass')        return chalk.green.bold(verdict.toUpperCase());
-  if (verdict === 'inconclusive') return chalk.dim(verdict.toUpperCase());
-  return verdict.toUpperCase();
+  return verdictTint(verdict)(bold(verdict.toUpperCase()));
 }
 
 export function buildRunsCommand(): Command {
@@ -43,9 +38,12 @@ export function buildRunsCommand(): Command {
             const judgePath = runFilePath(info.root, id, 'judge.json');
             let verdict: string | undefined;
             try {
-              const raw = JSON.parse(await readFile(judgePath, 'utf8')) as { output?: JudgeOutput } | JudgeOutput;
-              const judge = raw && typeof raw === 'object' && 'output' in raw && raw.output
-                ? raw.output : raw as JudgeOutput;
+              const raw = JSON.parse(await readFile(judgePath, 'utf8')) as
+                { output?: JudgeOutput } | JudgeOutput;
+              const judge =
+                raw && typeof raw === 'object' && 'output' in raw && raw.output
+                  ? raw.output
+                  : (raw as JudgeOutput);
               verdict = judge?.verdict;
             } catch {
               // no judge output yet
@@ -57,21 +55,25 @@ export function buildRunsCommand(): Command {
           if (rows.length >= limit * 3) break;
         }
 
-        const filtered = options.verdict
-          ? rows.filter((r) => r.verdict === options.verdict)
-          : rows;
+        const filtered = options.verdict ? rows.filter((r) => r.verdict === options.verdict) : rows;
 
         const display = filtered.slice(0, limit);
 
         if (options.json) {
-          console.log(JSON.stringify(display.map((r) => ({
-            runId: r.id,
-            startedAt: r.record.startedAt,
-            command: r.record.wrappedCommand.join(' '),
-            verdict: r.verdict ?? 'pending',
-            fileCount: r.record.changedFiles?.length ?? 0,
-            branch: r.record.branch,
-          })), null, 2));
+          console.log(
+            JSON.stringify(
+              display.map((r) => ({
+                runId: r.id,
+                startedAt: r.record.startedAt,
+                command: r.record.wrappedCommand.join(' '),
+                verdict: r.verdict ?? 'pending',
+                fileCount: r.record.changedFiles?.length ?? 0,
+                branch: r.record.branch,
+              })),
+              null,
+              2,
+            ),
+          );
           return;
         }
 
@@ -83,22 +85,32 @@ export function buildRunsCommand(): Command {
           'Files'.padEnd(colW[3]!),
           'Command',
         ].join('  ');
-        console.log(c() ? chalk.dim(header) : header);
-        console.log('─'.repeat(90));
+        console.log(subtle(header));
+        console.log(subtle('─'.repeat(90)));
 
         for (const { id, record, verdict } of display) {
-          const date = new Date(record.startedAt).toLocaleDateString(undefined, { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+          const date = new Date(record.startedAt).toLocaleDateString(undefined, {
+            month: 'short',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+          });
           const cmd = record.wrappedCommand.join(' ');
           const truncCmd = cmd.length > 36 ? cmd.slice(0, 33) + '…' : cmd;
           const files = String(record.changedFiles?.length ?? '?');
-          const v = verdict ? verdictColor(verdict) : (c() ? chalk.dim('—') : '—');
-          console.log([
-            id.padEnd(colW[0]!),
-            date.padEnd(colW[1]!),
-            (verdict ?? '—').toUpperCase().padEnd(colW[2]!).replace((verdict ?? '').toUpperCase(), v),
-            files.padEnd(colW[3]!),
-            truncCmd,
-          ].join('  '));
+          const v = verdict ? verdictColor(verdict) : subtle('—');
+          console.log(
+            [
+              id.padEnd(colW[0]!),
+              date.padEnd(colW[1]!),
+              (verdict ?? '—')
+                .toUpperCase()
+                .padEnd(colW[2]!)
+                .replace((verdict ?? '').toUpperCase(), v),
+              files.padEnd(colW[3]!),
+              truncCmd,
+            ].join('  '),
+          );
         }
 
         if (filtered.length === 0 && options.verdict) {

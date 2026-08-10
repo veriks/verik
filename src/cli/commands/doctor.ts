@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import chalk from 'chalk';
+import { block, pass, warn } from '../output/theme.js';
 import Anthropic from '@anthropic-ai/sdk';
 import { getRepositoryInfo } from '../../core/repository/git-repository.js';
 import { loadConfig, loadPolicy } from '../../config/config-loader.js';
@@ -7,10 +7,9 @@ import { validateBuilderCommands } from '../../stages/builder/command-allowlist.
 import { join } from 'node:path';
 import { access } from 'node:fs/promises';
 
-const c = () => process.stdout.isTTY && !process.env['NO_COLOR'];
-const ok = (s: string) => (c() ? chalk.green('✓') + ' ' + s : '✓ ' + s);
-const err = (s: string) => (c() ? chalk.red('✗') + ' ' + s : '✗ ' + s);
-const wrn = (s: string) => (c() ? chalk.yellow('~') + ' ' + s : '~ ' + s);
+const ok = (s: string) => `${pass('✓')} ${s}`;
+const err = (s: string) => `${block('✕')} ${s}`;
+const wrn = (s: string) => `${warn('~')} ${s}`;
 
 interface CheckResult {
   label: string;
@@ -214,18 +213,12 @@ export function buildDoctorCommand(): Command {
 
       console.log('');
       if (failed.length === 0 && warned.length === 0) {
-        console.log(c() ? chalk.green('Everything looks good.') : 'Everything looks good.');
+        console.log(pass('Everything looks good.'));
       } else if (failed.length > 0) {
-        console.log(
-          c()
-            ? chalk.red(`${failed.length} check(s) failed.`)
-            : `${failed.length} check(s) failed.`,
-        );
+        console.log(block(`${failed.length} check(s) failed.`));
         process.exit(1);
       } else {
-        console.log(
-          c() ? chalk.yellow(`${warned.length} warning(s).`) : `${warned.length} warning(s).`,
-        );
+        console.log(warn(`${warned.length} warning(s).`));
       }
     });
 }
