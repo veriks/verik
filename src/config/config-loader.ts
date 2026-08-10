@@ -1,6 +1,6 @@
 import { CrosscheckConfigSchema, PolicyConfigSchema } from './config-schema.js';
 import type { CrosscheckConfig, PolicyConfig } from './config-schema.js';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ConfigError } from '../shared/errors.js';
 import { validateBuilderCommands } from '../stages/builder/command-allowlist.js';
@@ -52,9 +52,27 @@ export async function loadPolicy(repoRoot: string): Promise<PolicyConfig> {
   }
 }
 
+/**
+ * Writes policy.json back.
+ *
+ * Validated before writing, so a bad edit fails here rather than at the start
+ * of someone's next commit. Formatted with two-space indent and a trailing
+ * newline because this file is committed and read in pull requests — a policy
+ * change should produce a clean, minimal diff.
+ */
+export async function savePolicy(repoRoot: string, policy: PolicyConfig): Promise<void> {
+  const result = PolicyConfigSchema.safeParse(policy);
+  if (!result.success) {
+    throw new ConfigError(`Refusing to write an invalid policy: ${result.error.message}`);
+  }
+  const policyPath = join(repoRoot, CROSSCHECK_DIR, 'policy.json');
+  await mkdir(join(repoRoot, CROSSCHECK_DIR), { recursive: true });
+  await writeFile(policyPath, `${JSON.stringify(result.data, null, 2)}\n`, 'utf8');
+}
+
 function applyEnvironmentOverrides(config: CrosscheckConfig): CrosscheckConfig {
-  const scout    = process.env['CROSSCHECK_MODEL_SCOUT']    ?? config.models.scout;
+  const scout = process.env['CROSSCHECK_MODEL_SCOUT'] ?? config.models.scout;
   const reviewer = process.env['CROSSCHECK_MODEL_REVIEWER'] ?? config.models.reviewer;
-  const judge    = process.env['CROSSCHECK_MODEL_JUDGE']    ?? config.models.judge;
+  const judge = process.env['CROSSCHECK_MODEL_JUDGE'] ?? config.models.judge;
   return { ...config, models: { scout, reviewer, judge } };
 }

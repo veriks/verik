@@ -14,6 +14,8 @@ import { buildDoctorCommand } from './commands/doctor.js';
 import { buildDryRunCommand } from './commands/dry-run.js';
 import { buildBeginCommand } from './commands/begin.js';
 import { buildHookCommand } from './commands/hook.js';
+import { buildRulesCommand } from './commands/rules.js';
+import { buildPolicyCommand } from './commands/policy.js';
 import { banner } from './output/theme.js';
 
 const VERSION = '0.1.0';
@@ -44,6 +46,8 @@ program.addCommand(buildRunCommand());
 program.addCommand(buildDryRunCommand());
 program.addCommand(buildBeginCommand());
 program.addCommand(buildHookCommand());
+program.addCommand(buildRulesCommand());
+program.addCommand(buildPolicyCommand());
 program.addCommand(buildInitCommand());
 program.addCommand(buildDoctorCommand());
 program.addCommand(buildStatusCommand());

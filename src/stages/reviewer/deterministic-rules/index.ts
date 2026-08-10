@@ -28,7 +28,25 @@ export interface RuleContext {
 export interface DeterministicRule {
   id: string;
   title: string;
+  /**
+   * Severity this rule's findings carry before any policy remapping. Declared
+   * rather than derived so `crosscheck rules` can list the catalogue without
+   * running a single rule against a diff.
+   */
+  defaultSeverity?: Severity;
   run(context: RuleContext): Promise<DeterministicFinding[]>;
+}
+
+export interface RuleSummary {
+  id: string;
+  title: string;
+  severity: Severity;
+}
+
+/** The catalogue, for listing and validating rule IDs. */
+export async function listRules(): Promise<RuleSummary[]> {
+  const rules = await loadRules();
+  return rules.map((r) => ({ id: r.id, title: r.title, severity: r.defaultSeverity ?? 'medium' }));
 }
 
 const SEVERITY_ORDER: Record<Severity, number> = {

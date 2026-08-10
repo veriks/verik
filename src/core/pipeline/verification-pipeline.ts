@@ -10,6 +10,7 @@ import { runStage } from './stage.js';
 import { logger } from '../../shared/logger.js';
 import { runDeterministicPass } from '../../stages/reviewer/deterministic-pass.js';
 import type { DeterministicFinding } from '../../stages/reviewer/deterministic-rules/index.js';
+import type { SuppressedFinding } from '../policy/override-engine.js';
 
 export interface PipelineResult {
   scout?: ScoutOutput;
@@ -23,6 +24,14 @@ export interface PipelineResult {
    * "deterministic evidence takes precedence" invariant.
    */
   deterministicFindings: DeterministicFinding[];
+  /**
+   * Findings a policy or an override removed from the blocking path.
+   *
+   * Carried through rather than discarded so that turning a rule off can never
+   * hide something without trace: the report can always say what was silenced
+   * and on whose authority.
+   */
+  suppressedFindings: SuppressedFinding[];
   stageStatuses: Partial<Record<'scout' | 'builder' | 'reviewer' | 'judge', StageRunStatus>>;
   stageMetadata: Partial<Record<'scout' | 'builder' | 'reviewer' | 'judge', StageMetadata>>;
   errors: string[];
@@ -192,6 +201,7 @@ export async function runVerificationPipeline(context: RunContext): Promise<Pipe
     judge,
     policy,
     deterministicFindings: deterministic.findings,
+    suppressedFindings: deterministic.suppressed,
     stageStatuses,
     stageMetadata,
     errors,

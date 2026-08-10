@@ -3,6 +3,7 @@ import type { DeterministicRule, DeterministicFinding, RuleContext } from './ind
 export class LockfileChangedRule implements DeterministicRule {
   id = 'lockfile-changed';
   title = 'Dependency lockfile changed';
+  defaultSeverity = 'info' as const;
 
   async run(ctx: RuleContext): Promise<DeterministicFinding[]> {
     const lockfiles = ctx.diff.changedFiles.filter((f) =>

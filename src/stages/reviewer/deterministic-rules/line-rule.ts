@@ -87,6 +87,7 @@ export function defineLineRule(spec: LineRuleSpec): DeterministicRule {
   return {
     id: spec.id,
     title: spec.title,
+    defaultSeverity: spec.severity,
     async run(ctx: RuleContext): Promise<DeterministicFinding[]> {
       const findings: DeterministicFinding[] = [];
       const seen = new Set<string>();

@@ -4,6 +4,7 @@ import { iterateAddedLines } from './patch-lines.js';
 export class EmptyCatchRule implements DeterministicRule {
   id = 'empty-catch';
   title = 'Empty catch block';
+  defaultSeverity = 'low' as const;
 
   async run(ctx: RuleContext): Promise<DeterministicFinding[]> {
     const findings: DeterministicFinding[] = [];

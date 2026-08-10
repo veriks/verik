@@ -3,6 +3,7 @@ import type { DeterministicRule, DeterministicFinding, RuleContext } from './ind
 export class EnvFileRule implements DeterministicRule {
   id = 'env-file-added';
   title = '.env file introduced';
+  defaultSeverity = 'high' as const;
 
   async run(ctx: RuleContext): Promise<DeterministicFinding[]> {
     const envFiles = ctx.diff.changedFiles.filter(

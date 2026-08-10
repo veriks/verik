@@ -74,6 +74,39 @@ export const CrosscheckConfigSchema = z.object({
 
 export type CrosscheckConfig = z.infer<typeof CrosscheckConfigSchema>;
 
+/**
+ * Turning a rule off is a decision someone should be able to review.
+ *
+ * The reason is required and lives in a committed file, so "we disabled the
+ * secret scanner" arrives as a line in a pull request rather than as silence.
+ * `at` is stamped automatically to make an old, forgotten exemption visible.
+ */
+export const DisabledRuleSchema = z.object({
+  id: z.string().min(1),
+  reason: z.string().min(1),
+  at: z.string().optional(),
+});
+
+/**
+ * Per-rule tuning.
+ *
+ * `severity` is the lever to reach for first: it keeps a finding in the report
+ * while stopping it from blocking, so the information survives. `disabled` is
+ * the escape hatch — and even then the rule still runs and the finding is
+ * recorded as suppressed, so nothing a rule found can vanish without trace.
+ */
+export const RulePolicySchema = z
+  .object({
+    severity: z
+      .record(z.string(), z.enum(['info', 'low', 'medium', 'high', 'critical']))
+      .default({}),
+    disabled: z.array(DisabledRuleSchema).default([]),
+  })
+  .default({ severity: {}, disabled: [] });
+
+export type RulePolicy = z.infer<typeof RulePolicySchema>;
+export type DisabledRule = z.infer<typeof DisabledRuleSchema>;
+
 export const PolicyConfigSchema = z.object({
   version: z.literal(1),
   mode: z.enum(['shadow', 'advisory', 'blocking']).default('advisory'),
@@ -81,6 +114,7 @@ export const PolicyConfigSchema = z.object({
   minimumBlockingConfidence: z.number().min(0).max(1).default(0.8),
   requireBuilderSuccess: z.boolean().default(false),
   allowOverride: z.boolean().default(true),
+  rules: RulePolicySchema,
 });
 
 export type PolicyConfig = z.infer<typeof PolicyConfigSchema>;
