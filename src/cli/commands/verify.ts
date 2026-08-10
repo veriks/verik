@@ -14,6 +14,7 @@ import { getOrCreateFingerprint } from '../../core/repository/repo-fingerprint.j
 import { VerificationCache } from '../../core/cache/verification-cache.js';
 import { selectContext } from '../../core/context/context-selector.js';
 import { createProgress } from '../output/progress.js';
+import { resolveExit } from '../../core/run/exit-code.js';
 
 export function buildVerifyCommand(): Command {
   return new Command('verify')
@@ -21,6 +22,10 @@ export function buildVerifyCommand(): Command {
     .option('--json', 'Output JSON')
     .option('--quiet', 'Suppress output')
     .option('--intent <text>', 'User intent')
+    .option(
+      '--base <ref>',
+      'Verify the range <ref>..HEAD instead of uncommitted changes (for CI, where the checkout is clean)',
+    )
     .action(async (options: Record<string, string | boolean>) => {
       try {
         const cwd = process.cwd();
@@ -37,6 +42,7 @@ export function buildVerifyCommand(): Command {
           maxDiffBytes: config.verification.maxDiffBytes,
           excludePatterns: config.privacy.excludePatterns,
           includeUntracked: config.verification.includeUntrackedFiles,
+          baseRef: options['base'] as string | undefined,
         });
 
         if (diff.changedFiles.length === 0) {
@@ -97,7 +103,15 @@ export function buildVerifyCommand(): Command {
 
         const pipeline = await runVerificationPipeline(context);
         await buildAndSaveReport(context, pipeline);
-        await saveRunJson(root, runId, 'metadata.json', { ...record, status: 'completed' });
+
+        // Same false-green trap as `run`: a missing verdict must not read as a pass.
+        const exit = resolveExit({
+          commandExitCode: null,
+          policy: pipeline.policy,
+          stageStatuses: pipeline.stageStatuses,
+          policyMode: policy.mode,
+        });
+        await saveRunJson(root, runId, 'metadata.json', { ...record, status: exit.status });
 
         const verdict = pipeline.judge?.verdict ?? 'inconclusive';
         if (!flags.quiet) {
@@ -109,7 +123,8 @@ export function buildVerifyCommand(): Command {
         if (flags.json) {
           console.log(JSON.stringify({ runId, verdict, policy: pipeline.policy }));
         }
-        process.exit(pipeline.policy?.exitCode ?? 0);
+        if (exit.warning && !flags.quiet) console.error(exit.warning);
+        process.exit(exit.exitCode);
       } catch (err) {
         console.error('Error:', String(err));
         process.exit(1);

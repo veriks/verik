@@ -2,12 +2,14 @@ import type { ScoutOutput } from '../scout/scout-schema.js';
 import type { BuilderOutput } from '../builder/builder-schema.js';
 import type { ReviewerOutput } from '../reviewer/reviewer-schema.js';
 import type { PolicyConfig } from '../../config/config-schema.js';
+import type { DeterministicFinding } from '../reviewer/deterministic-rules/index.js';
 
 export function buildJudgePrompt(
   scout: ScoutOutput | undefined,
   builder: BuilderOutput | undefined,
   reviewer: ReviewerOutput | undefined,
   policy: PolicyConfig,
+  deterministicFindings: DeterministicFinding[] = [],
 ): { system: string; user: string } {
   const system = `You are Judge, the final evidence aggregator in the Crosscheck pipeline.
 You receive structured outputs from Scout, Builder, and Reviewer.
@@ -39,7 +41,20 @@ Return ONLY the structured JudgeOutput JSON.`;
 
   const policySection = `POLICY: mode=${policy.mode}, blockAtSeverity=${policy.blockAtSeverity}, minConfidence=${policy.minimumBlockingConfidence}`;
 
-  const user = `${scoutSection}\n\n${builderSection}\n\n${reviewerSection}\n\n${policySection}\n\nReturn your JudgeOutput verdict.`;
+  // Rule output, not model output. Stated separately and explicitly so the
+  // Judge does not treat these as another opinion it may dismiss.
+  const deterministicSection = deterministicFindings.length
+    ? `DETERMINISTIC RULE FINDINGS (produced by code, not a model — treat as fact):\n` +
+      deterministicFindings
+        .map(
+          (f) =>
+            `- [${f.severity}] ${f.ruleId}: ${f.title}` +
+            (f.file ? ` (${f.file}${f.line ? `:${f.line}` : ''})` : ''),
+        )
+        .join('\n')
+    : 'DETERMINISTIC RULE FINDINGS: none fired.';
+
+  const user = `${scoutSection}\n\n${builderSection}\n\n${deterministicSection}\n\n${reviewerSection}\n\n${policySection}\n\nReturn your JudgeOutput verdict.`;
 
   return { system, user };
 }

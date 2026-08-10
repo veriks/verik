@@ -116,8 +116,14 @@ export async function computeWorktreeDiff(opts: {
   maxDiffBytes: number;
   excludePatterns: string[];
   includeUntracked?: boolean;
+  /**
+   * Compare against this ref instead of HEAD. In CI the checkout is clean, so
+   * there is nothing uncommitted to review — the change under review is the
+   * range `baseRef..HEAD`.
+   */
+  baseRef?: string;
 }): Promise<{ snapshot: RepositorySnapshot; diff: DiffResult }> {
-  const { createTreeWorkspace } = await import('./worktree-tree.js');
+  const { createTreeWorkspace, readRefTree } = await import('./worktree-tree.js');
   const { captureSnapshot } = await import('./repository-snapshot.js');
 
   const workspace = await createTreeWorkspace(opts.root);
@@ -128,10 +134,13 @@ export async function computeWorktreeDiff(opts: {
       'worktree',
       opts.includeUntracked ?? true,
     );
+    const baseTree = opts.baseRef
+      ? await readRefTree(opts.root, workspace, opts.baseRef)
+      : snapshot.headTree;
     const diff = await computeDiff({
       root: opts.root,
       workspace,
-      baseline: { ...snapshot, tree: snapshot.headTree, dirty: false },
+      baseline: { ...snapshot, tree: baseTree, dirty: false },
       final: snapshot,
       maxDiffBytes: opts.maxDiffBytes,
       excludePatterns: opts.excludePatterns,
