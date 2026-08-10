@@ -1,5 +1,15 @@
 name: Crosscheck
 
+# Crosscheck verifying its own pull requests.
+#
+# This builds from the checkout rather than installing from npm. Installing the
+# published package would verify each PR using the *last released* version, so
+# the change under review would never be the thing doing the reviewing — and a
+# PR that breaks Crosscheck would be reviewed by the old, working Crosscheck.
+#
+# Users integrating Crosscheck into their own repository should install from npm
+# instead — see docs/ci.md for that version.
+
 on:
   pull_request:
     branches: [main, master]
@@ -12,15 +22,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          # --base needs the base branch's history, not just the PR head.
           fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: pnpm
 
-      - name: Install Crosscheck
-        run: npm install -g crosscheck
-        # Or pin a version: npm install -g crosscheck@0.1.0
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Crosscheck from this PR
+        run: pnpm build
 
       # No `crosscheck init` here. It writes .crosscheck/ into the working tree,
       # which would then be the only thing an uncommitted-changes verify could see.
@@ -29,13 +46,17 @@ jobs:
       - name: Verify the pull request
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
         # A PR checkout is clean, so there are no uncommitted changes to inspect.
         # --base makes the change under review the range base..HEAD.
+        #
+        # Exit codes: 0 pass/advisory · 2 policy block · 3 inconclusive
         run: |
-          crosscheck verify \
-            --base "origin/${{ github.event.pull_request.base.ref }}" \
-            --intent "PR: ${{ github.event.pull_request.title }}"
-        # Exit codes:
-        #   0 — pass / advisory mode (default)
-        #   2 — block (blocking policy mode only)
-        #   3 — inconclusive
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::notice title=Crosscheck skipped::ANTHROPIC_API_KEY is not set. Add it as a repository secret to enable self-verification."
+            exit 0
+          fi
+          node dist/index.js verify \
+            --base "origin/$BASE_REF" \
+            --intent "PR: $PR_TITLE"
