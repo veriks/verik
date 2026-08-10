@@ -9,6 +9,7 @@ import {
   brand,
   block,
   frameWidth,
+  MARK_RAW,
   mark,
   muted,
   pass,
@@ -29,7 +30,7 @@ function shortPath(absolute: string): string {
 export function printHeader(runId: string): void {
   const left = `${mark()}  ${bold('crosscheck')}`;
   // Pad on the raw text, not the coloured string — escape codes have no width.
-  const rawLeft = `✓✕  crosscheck`;
+  const rawLeft = `${MARK_RAW}  crosscheck`;
   const gap = Math.max(1, frameWidth() - rawLeft.length - runId.length);
   console.log(`\n${left}${' '.repeat(gap)}${subtle(runId)}`);
   console.log(rule());

@@ -9,7 +9,9 @@ Claude. Everything below was verified by running it, not recalled. Where somethi
 is unverified, it says so — please keep that property.
 
 For the commercial side — the free/paid boundary, distribution, licence position
-— see [docs/product-strategy.md](docs/product-strategy.md).
+— see [docs/product-strategy.md](docs/product-strategy.md). For what the product
+is and why it is not an AI code reviewer, see
+[docs/positioning.md](docs/positioning.md).
 
 ---
 
