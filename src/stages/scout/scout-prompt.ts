@@ -1,4 +1,5 @@
 import type { RunContext } from '../../core/run/run-context.js';
+import { redactCommandLine } from '../../shared/redaction.js';
 
 export interface ScoutPrompt {
   system: string;
@@ -21,7 +22,9 @@ Do NOT produce shell commands. The Builder uses a deterministic allowlist to map
 
 Respond ONLY with structured JSON matching the provided schema.`;
 
-  const patch = selectedContext?.diff ?? diff?.patch ?? '';
+  // Falls back to safePatch, never patch: an absent selectedContext must not
+  // silently downgrade to the unredacted diff.
+  const patch = selectedContext?.diff ?? diff?.safePatch ?? '';
   const changedFiles = diff?.changedFiles ?? [];
 
   const changedFilesList = changedFiles.map((f) => `  ${f.changeType}: ${f.path}`).join('\n');
@@ -50,7 +53,7 @@ Respond ONLY with structured JSON matching the provided schema.`;
     ? `\nCONTEXT LIMITATIONS: ${selectedContext.limitations.join('; ')}`
     : '';
 
-  const user = `WRAPPED COMMAND: ${record.wrappedCommand.join(' ')}
+  const user = `WRAPPED COMMAND: ${redactCommandLine(record.wrappedCommand)}
 REPOSITORY: ${record.repositoryPath}
 BRANCH: ${record.branch}
 COMMIT BEFORE: ${record.baselineCommitSha}

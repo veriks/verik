@@ -1,5 +1,6 @@
 import { redactSecrets } from '../../shared/redaction.js';
 import { shouldExcludeFromLlm } from '../context/source-redaction.js';
+import type { RawPatch, SafePatch } from './patch-types.js';
 
 /**
  * Removes excluded files and redacts secrets from a unified diff, before it
@@ -9,6 +10,8 @@ import { shouldExcludeFromLlm } from '../context/source-redaction.js';
  * consumer inherits it. Previously exclusion and redaction were applied only to
  * file *bodies* in the context selector, so a tracked `.env`, a `*.pem`, or an
  * `sk-…` on an added line travelled to the API inside the patch itself.
+ *
+ * This module is the sole minter of SafePatch — see patch-types.ts.
  */
 
 export interface ExcludedFile {
@@ -17,7 +20,7 @@ export interface ExcludedFile {
 }
 
 export interface SanitizedPatch {
-  patch: string;
+  patch: SafePatch;
   excludedFiles: ExcludedFile[];
   redactionCount: number;
 }
@@ -111,7 +114,7 @@ function redactHunkLine(line: string): { line: string; redacted: boolean } {
   return { line: marker + cleaned, redacted: cleaned !== body };
 }
 
-export function sanitizePatch(patch: string, excludePatterns: string[]): SanitizedPatch {
+export function sanitizePatch(patch: RawPatch, excludePatterns: string[]): SanitizedPatch {
   const excludedFiles: ExcludedFile[] = [];
   let redactionCount = 0;
   const kept: string[] = [];
@@ -161,7 +164,7 @@ export function sanitizePatch(patch: string, excludePatterns: string[]): Sanitiz
     for (const p of pathsInSection(section)) {
       if (shouldExcludeFromLlm(p, excludePatterns)) {
         return {
-          patch: '',
+          patch: '' as SafePatch,
           excludedFiles: [...excludedFiles, { path: p, reason: 'privacy-policy' }],
           redactionCount,
         };
@@ -169,7 +172,7 @@ export function sanitizePatch(patch: string, excludePatterns: string[]): Sanitiz
     }
   }
 
-  return { patch: sanitized, excludedFiles, redactionCount };
+  return { patch: sanitized as SafePatch, excludedFiles, redactionCount };
 }
 
 /**
@@ -202,4 +205,45 @@ export function truncatePatch(
 
   const note = dropped.length ? `\n... [diff truncated: ${dropped.length} file(s) omitted]` : '';
   return { patch: kept.join('\n') + note, truncated: true, droppedFiles: dropped };
+}
+
+export interface PreparedPatch extends SanitizedPatch {
+  truncated: boolean;
+  droppedFiles: string[];
+}
+
+/**
+ * The single path from git output to something sendable: redact, then truncate.
+ *
+ * Order is load-bearing and not interchangeable. Truncating first can cut a
+ * `-----BEGIN PRIVATE KEY-----` block before its `-----END`, and both the
+ * multi-line regex and the stateful block tracker key off that terminator — so
+ * the tail of a key would survive into the prompt as ordinary base64.
+ */
+export function prepareSafePatch(
+  raw: RawPatch,
+  excludePatterns: string[],
+  maxBytes: number,
+): PreparedPatch {
+  const sanitized = sanitizePatch(raw, excludePatterns);
+  const truncated = truncatePatch(sanitized.patch, maxBytes);
+
+  return {
+    patch: truncated.patch as SafePatch,
+    excludedFiles: sanitized.excludedFiles,
+    redactionCount: sanitized.redactionCount,
+    truncated: truncated.truncated,
+    droppedFiles: truncated.droppedFiles,
+  };
+}
+
+/**
+ * Re-brands text derived from an already-safe patch.
+ *
+ * Legitimate only when `derived` is a pure length reduction of `source` —
+ * truncation, slicing — so no unsanitised content can be reintroduced. Every
+ * call site is a place a reviewer should look; there should be very few.
+ */
+export function narrowSafePatch(_source: SafePatch, derived: string): SafePatch {
+  return derived as SafePatch;
 }

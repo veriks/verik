@@ -1,5 +1,6 @@
 import type { RunContext } from '../run/run-context.js';
 import type { PipelineResult } from '../pipeline/verification-pipeline.js';
+import { redactCommandLine } from '../../shared/redaction.js';
 
 export function renderReport(context: RunContext, pipeline: PipelineResult): string {
   const { record, diff } = context;
@@ -10,7 +11,7 @@ export function renderReport(context: RunContext, pipeline: PipelineResult): str
   lines.push(`**Generated:** ${new Date().toISOString()}`);
 
   lines.push(`\n## 1. Overview`);
-  lines.push(`- Command: \`${record.wrappedCommand.join(' ')}\``);
+  lines.push(`- Command: \`${redactCommandLine(record.wrappedCommand)}\``);
   lines.push(`- Branch: ${record.branch}`);
   lines.push(`- Baseline commit: ${record.baselineCommitSha}`);
   if (context.intent) lines.push(`- Intent: ${context.intent}`);
@@ -27,8 +28,16 @@ export function renderReport(context: RunContext, pipeline: PipelineResult): str
     for (const p of diff.commandIntroducedPaths) lines.push(`- \`${p}\``);
   }
   if (diff?.preExistingChangedPaths.length) {
-    lines.push(`\n### Pre-existing changes (not attributed to this command)`);
-    for (const p of diff.preExistingChangedPaths) lines.push(`- \`${p}\``);
+    // These sets legitimately overlap: tree-based attribution can credit the
+    // command's hunk in a file that was already dirty. Marking the overlap is
+    // clearer than the old "not attributed" heading, which is now only true of
+    // the files that appear here alone.
+    const introduced = new Set(diff.commandIntroducedPaths);
+    lines.push(`\n### Already modified before this command ran`);
+    for (const p of diff.preExistingChangedPaths) {
+      const both = introduced.has(p);
+      lines.push(`- \`${p}\`${both ? ' — also edited by this command (its hunks are above)' : ''}`);
+    }
   }
 
   lines.push(`\n## 3. Stage Results`);
@@ -113,8 +122,10 @@ export function renderReport(context: RunContext, pipeline: PipelineResult): str
       lines.push(`\n**Reasons:**`);
       for (const reason of j.reasons) {
         lines.push(`- [${reason.severity.toUpperCase()}] ${reason.title}`);
-        if (reason.findingIds.length) lines.push(`  - Finding refs: ${reason.findingIds.join(', ')}`);
-        if (reason.builderEvidenceRefs.length) lines.push(`  - Builder refs: ${reason.builderEvidenceRefs.join(', ')}`);
+        if (reason.findingIds.length)
+          lines.push(`  - Finding refs: ${reason.findingIds.join(', ')}`);
+        if (reason.builderEvidenceRefs.length)
+          lines.push(`  - Builder refs: ${reason.builderEvidenceRefs.join(', ')}`);
       }
     }
     if (j.requiredActions.length) {
@@ -149,7 +160,9 @@ export function renderReport(context: RunContext, pipeline: PipelineResult): str
   }
 
   lines.push(`\n---`);
-  lines.push(`*Crosscheck is an early verification system. It is not a guarantee of correctness or security.*`);
+  lines.push(
+    `*Crosscheck is an early verification system. It is not a guarantee of correctness or security.*`,
+  );
 
   return lines.join('\n') + '\n';
 }

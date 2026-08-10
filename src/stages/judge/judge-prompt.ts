@@ -20,13 +20,21 @@ Return ONLY the structured JudgeOutput JSON.`;
     ? `SCOUT: ${scout.riskLevel} risk, ${scout.changeType}, affected: ${scout.affectedAreas.join(', ')}`
     : 'SCOUT: unavailable';
 
+  // Limitations are included so an unrunnable check is not mistaken for a
+  // failing one — "no signal" and "bad signal" warrant different verdicts.
   const builderSection = builder
-    ? `BUILDER: ${builder.overallStatus}\n${builder.evidence.map((e) => `  - ${e.summary}`).join('\n')}`
+    ? [
+        `BUILDER: ${builder.overallStatus}`,
+        ...builder.evidence.map((e) => `  - ${e.summary}`),
+        ...builder.limitations.map((l) => `  ! ${l}`),
+      ].join('\n')
     : 'BUILDER: not run';
 
   const reviewerSection = reviewer
     ? `REVIEWER VERDICT: ${reviewer.recommendedVerdict}\nFINDINGS (${reviewer.findings.length}):\n` +
-      reviewer.findings.map((f) => `  [${f.severity}] ${f.title} (confidence: ${f.confidence})\n    ${f.summary}`).join('\n')
+      reviewer.findings
+        .map((f) => `  [${f.severity}] ${f.title} (confidence: ${f.confidence})\n    ${f.summary}`)
+        .join('\n')
     : 'REVIEWER: unavailable';
 
   const policySection = `POLICY: mode=${policy.mode}, blockAtSeverity=${policy.blockAtSeverity}, minConfidence=${policy.minimumBlockingConfidence}`;
