@@ -195,10 +195,11 @@ gaps between the claims above and the code today.
   key on one repository, once. Nobody has measured precision or recall. Every
   claim in §3 under *Judgement* is architectural, not empirical. This is the
   single most important open item.
-- **Policy cannot act on the strongest evidence.** `evaluatePolicy` consumes the
-  Judge verdict only. A deterministic rule firing at critical severity — a secret
-  in the diff — cannot block on its own, and in rules mode there is no policy
-  evaluation at all. "Whether it ships" is therefore partly aspirational today.
+- ~~Policy cannot act on the strongest evidence.~~ **Closed.** Deterministic
+  findings are now evaluated independently of, and before, the Judge — a rule at
+  or above the severity threshold blocks in blocking mode with no model in the
+  loop, and rules mode gets a real policy decision. Verified end to end: a
+  critical secret-leak with no Judge at all exits 2.
 - **The record is not tamper-evident.** Provenance is captured per stage, but the
   run directory is plain files anyone can edit. Adequate for "help me trust this
   change"; not yet adequate for "show the auditor."
