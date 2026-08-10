@@ -38,6 +38,14 @@ jobs:
       - name: Build standalone binaries
         run: node scripts/pkg-build.mjs
 
+      # Never publish an artifact nobody has run. `demo` exercises the whole
+      # pipeline — CLI wiring, report rendering, policy — with no network or
+      # API key, so a bundle that cannot start fails here rather than for users.
+      - name: Smoke-test the built bundle
+        run: |
+          node dist/index.js --version
+          node dist/index.js demo
+
       - name: Publish to npm
         run: npm publish --provenance --access public
         env:
