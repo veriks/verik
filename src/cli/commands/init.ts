@@ -1,3 +1,5 @@
+import { block } from '../output/theme.js';
+import { formatError } from '../../shared/format-error.js';
 import { Command } from 'commander';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -114,7 +116,7 @@ export function buildInitCommand(): Command {
           console.error('Error:', err.message);
           process.exit(err.exitCode);
         }
-        console.error('Error:', String(err));
+        console.error(`${block('✕')} ${formatError(err)}`);
         process.exit(1);
       }
     });

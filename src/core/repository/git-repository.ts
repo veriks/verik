@@ -30,10 +30,11 @@ export async function getRepositoryInfo(dir: string): Promise<RepositoryInfo> {
     isBorn = false;
   }
 
-  if (!isBorn) {
-    throw new RepositoryError('Repository has no commits yet (unborn).');
-  }
-
+  // An unborn HEAD is a supported state, not an error. `git init` followed by
+  // `crosscheck init` is the first thing a new user does, and the tree
+  // machinery already handles it — `read-tree --empty` gives an empty baseline,
+  // against which every file reads as added, which is exactly right for a
+  // repository whose first commit has not happened yet.
   const status = await gitWithRoot.status();
   const branch = status.current ?? 'HEAD';
   const isDetachedHead = status.detached ?? false;

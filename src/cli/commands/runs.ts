@@ -1,3 +1,5 @@
+import { block } from '../output/theme.js';
+import { formatError } from '../../shared/format-error.js';
 import { Command } from 'commander';
 import { bold, subtle, verdictTint } from '../output/theme.js';
 import { getRepositoryInfo } from '../../core/repository/git-repository.js';
@@ -117,7 +119,7 @@ export function buildRunsCommand(): Command {
           console.log(`No runs with verdict "${options.verdict}" found.`);
         }
       } catch (err) {
-        console.error('Error:', String(err));
+        console.error(`${block('✕')} ${formatError(err)}`);
         process.exit(1);
       }
     });

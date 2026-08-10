@@ -1,3 +1,5 @@
+import { block } from '../output/theme.js';
+import { formatError } from '../../shared/format-error.js';
 import { Command } from 'commander';
 import { readFile } from 'node:fs/promises';
 import { getRepositoryInfo } from '../../core/repository/git-repository.js';
@@ -77,7 +79,7 @@ export function buildExplainCommand(): Command {
           console.log('This run may not have completed verification.');
         }
       } catch (err) {
-        console.error('Error:', String(err));
+        console.error(`${block('✕')} ${formatError(err)}`);
         process.exit(1);
       }
     });

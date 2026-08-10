@@ -1,3 +1,5 @@
+import { block } from '../output/theme.js';
+import { formatError } from '../../shared/format-error.js';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { getRepositoryInfo } from '../../core/repository/git-repository.js';
@@ -146,7 +148,7 @@ export function buildDryRunCommand(): Command {
         console.log(dim('Run without --dry-run to execute.'));
         console.log();
       } catch (err) {
-        console.error('Error:', String(err));
+        console.error(`${block('✕')} ${formatError(err)}`);
         process.exit(1);
       }
     });

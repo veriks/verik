@@ -1,3 +1,5 @@
+import { block } from '../output/theme.js';
+import { formatError } from '../../shared/format-error.js';
 import { Command } from 'commander';
 import { getRepositoryInfo } from '../../core/repository/git-repository.js';
 import { computeWorktreeDiff } from '../../core/repository/diff-capture.js';
@@ -148,7 +150,7 @@ export function buildVerifyCommand(): Command {
         if (exit.warning && !flags.quiet) console.error(exit.warning);
         process.exit(exit.exitCode);
       } catch (err) {
-        console.error('Error:', String(err));
+        console.error(`${block('✕')} ${formatError(err)}`);
         process.exit(1);
       }
     });

@@ -1,3 +1,4 @@
+import { formatError } from '../../shared/format-error.js';
 import { Command } from 'commander';
 import { readFile } from 'node:fs/promises';
 import { block, bold, brand, pass, subtle, warn as warnTint } from '../output/theme.js';
@@ -167,7 +168,7 @@ export function buildInspectCommand(): Command {
 
         console.log();
       } catch (err) {
-        console.error('Error:', String(err));
+        console.error(`${block('✕')} ${formatError(err)}`);
         process.exit(1);
       }
     });
