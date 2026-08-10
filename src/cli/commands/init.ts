@@ -6,28 +6,42 @@ import { CrosscheckError } from '../../shared/errors.js';
 import { DEFAULT_CONFIG, DEFAULT_POLICY, DEFAULT_MODELS } from '../../config/defaults.js';
 import { getOrCreateFingerprint } from '../../core/repository/repo-fingerprint.js';
 import { PROVIDERS, resolveApiKey, type ProviderId } from '../../inference/providers.js';
-import { ask, isInteractive, select } from '../output/prompt.js';
-import { banner, brand, kv, muted, pass, section, subtle, warn } from '../output/theme.js';
+import { PromptCancelled } from '../output/keypress.js';
+import { ask, isInteractive, select, stepHeader } from '../output/prompt.js';
+import { banner, box, brand, mark, muted, pass, subtle, warn } from '../output/theme.js';
 
 type Mode = 'rules' | 'full';
+
 interface StageModels {
   scout: string;
   reviewer: string;
   judge: string;
 }
 
+interface Setup {
+  mode: Mode;
+  provider: ProviderId;
+  baseUrl?: string;
+  models: StageModels;
+}
+
 /**
  * Onboarding.
  *
- * The point of asking rather than assuming: the deterministic rules and the
- * Builder need no API key at all, so a user without one still has a working
- * product. Previously that user got a config demanding a key, then a run where
- * every stage failed — the worst possible first impression of something that
- * does in fact work.
+ * Two principles drive the shape of this.
+ *
+ * First, `rules` mode is a real product, not a consolation prize: the
+ * deterministic rules and the Builder are plain code and need no API key, so a
+ * user without one still gets working verification. It is presented as a peer of
+ * the full pipeline, not a fallback.
+ *
+ * Second, ask as little as possible. Anything detectable from the environment is
+ * detected and shown as a badge rather than asked about, so the common path is
+ * two keypresses.
  */
 export function buildInitCommand(): Command {
   return new Command('init')
-    .description('Initialize Crosscheck in the current repository')
+    .description('Set up Crosscheck in the current repository')
     .option('-y, --yes', 'Accept defaults without prompting (for CI and scripts)')
     .option('--provider <id>', 'Inference provider (skips the prompt)')
     .option('--mode <mode>', 'rules | full')
@@ -35,45 +49,41 @@ export function buildInitCommand(): Command {
       try {
         const info = await getRepositoryInfo(process.cwd());
         const ccDir = join(info.root, '.crosscheck');
-
         const interactive = isInteractive() && !options.yes;
+
         if (interactive) console.log(banner());
 
-        const mode = await chooseMode(options, interactive);
-        const { provider, baseUrl, models } = await chooseProvider(options, mode, interactive);
+        const setup = await collectSetup(options, interactive);
 
         await mkdir(join(ccDir, 'runs'), { recursive: true });
         await mkdir(join(ccDir, 'cache'), { recursive: true });
 
         const config = {
           ...DEFAULT_CONFIG,
-          provider,
-          mode,
-          ...(baseUrl ? { baseUrl } : {}),
-          models,
+          provider: setup.provider,
+          mode: setup.mode,
+          ...(setup.baseUrl ? { baseUrl: setup.baseUrl } : {}),
+          models: setup.models,
         };
 
-        const configPath = join(ccDir, 'config.json');
-        const policyPath = join(ccDir, 'policy.json');
-        await writeFile(configPath, JSON.stringify(config, null, 2), 'utf8');
-        await writeFile(policyPath, JSON.stringify(DEFAULT_POLICY, null, 2), 'utf8');
+        await writeFile(join(ccDir, 'config.json'), JSON.stringify(config, null, 2), 'utf8');
+        await writeFile(
+          join(ccDir, 'policy.json'),
+          JSON.stringify(DEFAULT_POLICY, null, 2),
+          'utf8',
+        );
         await writeFile(join(ccDir, '.gitignore'), 'runs/\ncache/\n', 'utf8');
 
         // Create a stable repo fingerprint immediately so memory is scoped
         // correctly from the very first run, not only after the first LLM call.
-        const fingerprint = await getOrCreateFingerprint(info.root, info.remote);
+        await getOrCreateFingerprint(info.root, info.remote);
 
-        console.log(`\n${pass('✓')} Crosscheck initialized.\n`);
-        console.log(kv('config', configPath));
-        console.log(kv('policy', policyPath));
-        console.log(kv('repo id', fingerprint.repoId));
-        console.log(
-          kv('mode', mode === 'rules' ? 'rules only (no API key needed)' : 'full pipeline'),
-        );
-        console.log(kv('provider', PROVIDERS[provider].label));
-
-        printNextSteps(mode, provider);
+        printSummary(setup);
       } catch (err) {
+        if (err instanceof PromptCancelled) {
+          console.log(subtle('\n  Cancelled. Nothing was written.\n'));
+          process.exit(130);
+        }
         if (err instanceof CrosscheckError) {
           console.error('Error:', err.message);
           process.exit(err.exitCode);
@@ -84,110 +94,119 @@ export function buildInitCommand(): Command {
     });
 }
 
-async function chooseMode(options: { mode?: string }, interactive: boolean): Promise<Mode> {
-  if (options.mode === 'rules' || options.mode === 'full') return options.mode;
-  if (!interactive) return 'full';
-
-  return select<Mode>(
-    `${section('how much should crosscheck do?')}`,
-    [
-      {
-        value: 'full',
-        label: 'Full pipeline — Scout, Builder, Reviewer, Judge',
-        hint: 'Needs an API key. Roughly $0.15–0.60 per run depending on diff size and models.',
-      },
-      {
-        value: 'rules',
-        label: 'Rules only — deterministic checks and your build/test/lint',
-        hint: 'No API key, no network, nothing leaves your machine. Free forever.',
-      },
-    ],
-    0,
-  );
-}
-
-async function chooseProvider(
-  options: { provider?: string },
-  mode: Mode,
+async function collectSetup(
+  options: { provider?: string; mode?: string },
   interactive: boolean,
-): Promise<{ provider: ProviderId; baseUrl?: string; models: StageModels }> {
-  const fallback: { provider: ProviderId; models: StageModels } = {
-    provider: 'anthropic',
-    models: { ...DEFAULT_MODELS },
-  };
+): Promise<Setup> {
+  const flagMode = options.mode === 'rules' || options.mode === 'full' ? options.mode : undefined;
+  const flagProvider =
+    options.provider && options.provider in PROVIDERS
+      ? (options.provider as ProviderId)
+      : undefined;
 
-  if (options.provider && options.provider in PROVIDERS) {
-    return { ...fallback, provider: options.provider as ProviderId };
+  if (!interactive || (flagMode && (flagMode === 'rules' || flagProvider))) {
+    return {
+      mode: flagMode ?? 'full',
+      provider: flagProvider ?? 'anthropic',
+      models: { ...DEFAULT_MODELS },
+    };
   }
-  // Rules mode makes no inference calls, so the provider is irrelevant until
-  // the user switches to full — don't make them answer a question that has no
-  // effect on anything they are about to do.
-  if (mode === 'rules' || !interactive) return fallback;
 
-  const provider = await select<ProviderId>(
-    `${section('which provider?')}`,
-    [
-      {
-        value: 'anthropic',
-        label: 'Anthropic',
-        hint: 'Claude. Tiered defaults already configured.',
-      },
-      { value: 'openai', label: 'OpenAI' },
-      { value: 'openrouter', label: 'OpenRouter', hint: 'One key, many models from many vendors.' },
-      { value: 'google', label: 'Google (Gemini)' },
-      {
-        value: 'ollama',
-        label: 'Ollama (local)',
-        hint: 'Runs on your machine. No key, no data leaves it.',
-      },
-      {
-        value: 'custom',
-        label: 'Something else',
-        hint: 'Any OpenAI-compatible endpoint — Mistral, DeepSeek, Groq, Together, Fireworks, Hugging Face.',
-      },
-    ],
-    0,
-  );
+  // Rules mode asks one question; full asks two. Showing "of 2" and then
+  // stopping at 1 would read as a bug, so the total is decided after the first
+  // answer and only rendered from step 2 onwards.
+  const mode =
+    flagMode ??
+    (await select<Mode>({
+      header: stepHeader(mark(), 1, 2),
+      question: 'How much should Crosscheck do?',
+      choices: [
+        {
+          value: 'full',
+          label: 'Full pipeline',
+          hint: 'Scout · Builder · Reviewer · Judge — needs an API key, roughly $0.15–0.60 a run',
+        },
+        {
+          value: 'rules',
+          label: 'Rules only',
+          hint: 'Deterministic checks and your build/test/lint — no key, nothing leaves your machine',
+        },
+      ],
+    }));
+
+  if (mode === 'rules') {
+    return { mode, provider: 'anthropic', models: { ...DEFAULT_MODELS } };
+  }
+
+  const provider =
+    flagProvider ??
+    (await select<ProviderId>({
+      header: stepHeader(mark(), 2, 2),
+      question: 'Which provider?',
+      choices: (
+        [
+          ['anthropic', 'Anthropic', 'Claude — tiered defaults already configured'],
+          ['openai', 'OpenAI', ''],
+          ['openrouter', 'OpenRouter', 'One key, models from every vendor'],
+          ['google', 'Google', 'Gemini'],
+          ['ollama', 'Ollama', 'Local. No key, nothing leaves your machine'],
+          [
+            'custom',
+            'Something else',
+            'Any OpenAI-compatible endpoint — Mistral, DeepSeek, Groq, Together, Fireworks, Hugging Face',
+          ],
+        ] as const
+      ).map(([value, label, hint]) => ({
+        value: value as ProviderId,
+        label,
+        hint: hint || undefined,
+        // Detected rather than asked: if the key is already exported, say so.
+        badge: resolveApiKey(PROVIDERS[value as ProviderId]) ? 'key detected' : undefined,
+      })),
+    }));
 
   const spec = PROVIDERS[provider];
-  let baseUrl: string | undefined;
-  if (provider === 'custom') {
-    baseUrl = await ask('  Base URL (OpenAI-compatible)', 'https://');
-  }
+  const baseUrl =
+    provider === 'custom'
+      ? await ask('Base URL', 'https://', 'An OpenAI-compatible /chat/completions endpoint.')
+      : undefined;
 
-  // Anthropic ships with verified tiered defaults; for anything else the model
-  // ids differ per host and change often, so ask rather than guess — a wrong
-  // default only surfaces as a confusing 404 on the first real run.
+  // Anthropic ships verified tiered defaults. For anything else the ids differ
+  // per host and change often, so ask rather than guess — a wrong default only
+  // surfaces as a confusing 404 on the first real request.
   let models: StageModels = { ...DEFAULT_MODELS };
   if (provider !== 'anthropic') {
-    if (spec.exampleModels) console.log(subtle(`\n  ${spec.exampleModels}`));
-    const one = await ask('  Model to use for all three stages', '');
-    if (one) models = { scout: one, reviewer: one, judge: one };
+    const model = await ask('Model id', '', spec.exampleModels ?? 'Used for all three stages.');
+    if (model) models = { scout: model, reviewer: model, judge: model };
   }
 
-  return { provider, baseUrl, models };
+  return { mode, provider, baseUrl, models };
 }
 
-function printNextSteps(mode: Mode, provider: ProviderId): void {
-  const spec = PROVIDERS[provider];
-  console.log(`\n${section('next')}`);
+function printSummary(setup: Setup): void {
+  const spec = PROVIDERS[setup.provider];
+  const hasKey = Boolean(resolveApiKey(spec));
 
-  if (mode === 'full') {
-    const key = resolveApiKey(spec);
-    if (key) {
-      console.log(`  ${pass('✓')} ${spec.apiKeyEnv} is set`);
-    } else if (!spec.keyOptional) {
-      console.log(`  ${warn('!')} ${spec.apiKeyEnv} is not set — LLM stages will not run`);
-      console.log(subtle(`    export ${spec.apiKeyEnv}=...   (${spec.docs})`));
-    }
-  } else {
-    console.log(subtle('  Rules mode needs no key. Switch to the full pipeline any time with:'));
-    console.log(`    ${brand('crosscheck init --mode full')}`);
+  const body =
+    setup.mode === 'rules'
+      ? 'Deterministic rules and your build, test and lint commands. No API key, no network.'
+      : `Four stages via ${spec.label}. ${
+          hasKey ? `${spec.apiKeyEnv} is set.` : `Set ${spec.apiKeyEnv} before your first run.`
+        }`;
+
+  console.log();
+  for (const line of box('READY', body, hasKey || setup.mode === 'rules' ? pass : warn)) {
+    console.log(line);
+  }
+
+  if (setup.mode === 'full' && !hasKey && !spec.keyOptional) {
+    console.log(`\n  ${warn('!')} ${subtle(`export ${spec.apiKeyEnv}=...`)}`);
+    console.log(`    ${subtle(spec.docs)}`);
   }
 
   console.log(
-    `\n  ${brand('crosscheck verify')}${muted('               check your uncommitted changes')}`,
+    `\n  ${brand('crosscheck verify')}${muted('             check your uncommitted changes')}`,
   );
-  console.log(`  ${brand('crosscheck run -- <command>')}${muted('     wrap a coding agent')}`);
-  console.log(`  ${brand('crosscheck demo')}${muted('                 see a full fake run')}\n`);
+  console.log(`  ${brand('crosscheck run -- <cmd>')}${muted('       wrap a coding agent')}`);
+  console.log(`  ${brand('crosscheck demo')}${muted('               see a full fake run')}\n`);
 }
