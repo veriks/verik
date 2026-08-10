@@ -28,44 +28,31 @@ Terminal + report
 
 ## Install
 
-**npm — works everywhere Node.js is installed**
+**Not yet published to npm.** Build from source — this takes about a minute:
+
 ```sh
-npm install -g crosscheck
+git clone https://github.com/crosscheck-sh/crosscheck.git
+cd crosscheck && pnpm install && pnpm build && npm link
 ```
 
-**curl — macOS and Linux, no Node.js required**
-```sh
-curl -fsSL https://raw.githubusercontent.com/crosscheck-sh/crosscheck/main/scripts/install.sh | sh
-```
+Then `crosscheck --version` should print `0.1.0`.
 
-**PowerShell (Windows)**
-```powershell
-npm install -g crosscheck
-```
-
-**npx — one-off without installing**
-```sh
-npx crosscheck init
-npx crosscheck run -- claude -p "your prompt"
-```
+Full walkthrough on a real repository: **[docs/quickstart.md](docs/quickstart.md)**
 
 ## Quick start
 
 ```sh
-# 1. Initialize in your repository
-crosscheck init
+# 1. Initialize — `rules` mode needs no API key, no network
+crosscheck init --yes --mode rules
 
-# 2. Set your API key
-export ANTHROPIC_API_KEY=your-key-here
-
-# 3. Wrap a coding agent or any command
+# 2. Wrap a coding agent or any command
 crosscheck run -- claude -p "Add OAuth login"
 crosscheck run -- codex
 crosscheck run -- aider
 crosscheck run -- amp
 crosscheck verify
 
-# 4. Check the verdict
+# 3. Check the verdict
 crosscheck report
 crosscheck explain
 ```
@@ -161,12 +148,11 @@ export CROSSCHECK_MODEL_JUDGE=claude-opus-5
 
 | Code | Meaning |
 |------|---------|
-| 0 | Allowed / pass |
-| 1 | Internal Crosscheck error |
-| 2 | Policy denied / block |
-| 3 | Verification inconclusive |
-| 4 | Invalid configuration |
-| 5 | Wrapped command could not start |
+| `0` | Passed, or the policy chose not to block |
+| `1` | Crosscheck itself failed |
+| `2` | **Policy blocked** — do not ship |
+| `3` | Blocking mode, but verification never reached a verdict |
+| other | The wrapped command's own exit code, passed through |
 
 ## Verification stages
 
@@ -193,7 +179,7 @@ Every run stores under `.crosscheck/runs/<run-id>/`:
 - Secrets are redacted from diffs and logs before any LLM call
 - Environment variable values are never included in prompts
 - Files matching `excludePatterns` (`.env`, `*.pem`, `*.key`) are excluded
-- No code is uploaded unless ANTHROPIC_API_KEY is set
+- In `rules` mode nothing leaves the machine at all — no API key, no network
 
 ## Development
 
