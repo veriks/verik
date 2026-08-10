@@ -13,6 +13,9 @@ import { VerificationCache } from '../../core/cache/verification-cache.js';
 import { selectContext } from '../../core/context/context-selector.js';
 import { createProgress } from '../output/progress.js';
 import { resolveExit } from '../../core/run/exit-code.js';
+import { readCheckpoint, isStale } from '../../core/repository/checkpoint.js';
+import { ensureCheckpointStore } from '../../core/repository/worktree-tree.js';
+import { subtle, warn } from '../output/theme.js';
 import { printChanges, printHeader, printVerdictSummary } from '../output/terminal.js';
 
 export function buildVerifyCommand(): Command {
@@ -36,12 +39,28 @@ export function buildVerifyCommand(): Command {
         ]);
         const policy = await loadPolicy(root);
 
+        // An explicit checkpoint beats HEAD: it is the only baseline that can
+        // separate an unwrappable agent's work from the developer's own. An
+        // explicit --base still wins, since that is a deliberate instruction.
+        const baseRef = options['base'] as string | undefined;
+        const checkpoint = baseRef ? null : await readCheckpoint(root);
+        if (checkpoint && isStale(checkpoint, info.branch, info.commitSha)) {
+          console.error(
+            `${warn('!')} Checkpoint was taken on ${checkpoint.branch}@${checkpoint.commitSha.slice(0, 8)} — ignoring it and diffing against HEAD.`,
+          );
+          console.error(subtle('  Run crosscheck begin again to re-baseline.'));
+        }
+        const usable =
+          checkpoint && !isStale(checkpoint, info.branch, info.commitSha) ? checkpoint : null;
+
         const { snapshot, diff } = await computeWorktreeDiff({
           root,
           maxDiffBytes: config.verification.maxDiffBytes,
           excludePatterns: config.privacy.excludePatterns,
           includeUntracked: config.verification.includeUntrackedFiles,
-          baseRef: options['base'] as string | undefined,
+          baseRef,
+          baseTree: usable?.tree,
+          extraAlternates: usable ? [await ensureCheckpointStore(root)] : [],
         });
 
         if (diff.changedFiles.length === 0) {
