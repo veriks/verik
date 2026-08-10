@@ -187,6 +187,15 @@ export async function readHeadTree(root: string, ws: TreeWorkspace): Promise<str
   }
 }
 
+/**
+ * Resolves an arbitrary ref to its tree, for verifying a base..head range in CI
+ * where the working tree is clean and there is nothing uncommitted to inspect.
+ */
+export async function readRefTree(root: string, ws: TreeWorkspace, ref: string): Promise<string> {
+  const run = scoped(root, ws, 'ref');
+  return (await run(['rev-parse', `${ref}^{tree}`])).trim();
+}
+
 export interface TreeDiffFile {
   path: string;
   previousPath?: string;

@@ -54,11 +54,15 @@ export async function buildAndSaveReport(
       truncated: context.diff?.truncated ?? false,
     },
     stages: {
-      scout:    stageRecord(pipeline, 'scout'),
-      builder:  stageRecord(pipeline, 'builder'),
+      scout: stageRecord(pipeline, 'scout'),
+      builder: stageRecord(pipeline, 'builder'),
       reviewer: stageRecord(pipeline, 'reviewer'),
-      judge:    stageRecord(pipeline, 'judge'),
+      judge: stageRecord(pipeline, 'judge'),
     },
+    // Recorded alongside, not merged into, the Reviewer's findings: these are
+    // rule output rather than model output, and they exist even when the
+    // Reviewer stage failed entirely.
+    deterministicFindings: pipeline.deterministicFindings,
     evidence: evidence.items,
     policy: pipeline.policy,
     errors: pipeline.errors,
@@ -76,10 +80,20 @@ export async function buildAndSaveReport(
   // model, provider, promptVersion, promptHash, inputHash, token usage, duration.
   // crosscheck inspect reads these directly.
   const sm = pipeline.stageMetadata;
-  if (pipeline.scout)    await saveRunJson(repoRoot, runId, 'scout.json',    { ...sm.scout,    output: pipeline.scout });
-  if (pipeline.builder)  await saveRunJson(repoRoot, runId, 'builder.json',  { ...sm.builder,  output: pipeline.builder });
-  if (pipeline.reviewer) await saveRunJson(repoRoot, runId, 'reviewer.json', { ...sm.reviewer, output: pipeline.reviewer });
-  if (pipeline.judge)    await saveRunJson(repoRoot, runId, 'judge.json',    { ...sm.judge,    output: pipeline.judge });
+  if (pipeline.scout)
+    await saveRunJson(repoRoot, runId, 'scout.json', { ...sm.scout, output: pipeline.scout });
+  if (pipeline.builder)
+    await saveRunJson(repoRoot, runId, 'builder.json', { ...sm.builder, output: pipeline.builder });
+  if (pipeline.reviewer)
+    await saveRunJson(repoRoot, runId, 'reviewer.json', {
+      ...sm.reviewer,
+      output: pipeline.reviewer,
+    });
+  if (pipeline.judge)
+    await saveRunJson(repoRoot, runId, 'judge.json', { ...sm.judge, output: pipeline.judge });
+  if (pipeline.deterministicFindings.length) {
+    await saveRunJson(repoRoot, runId, 'deterministic.json', pipeline.deterministicFindings);
+  }
 }
 
 function stageRecord(pipeline: PipelineResult, stage: 'scout' | 'builder' | 'reviewer' | 'judge') {

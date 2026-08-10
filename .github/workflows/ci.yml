@@ -10,8 +10,22 @@ concurrency:
 
 jobs:
   ci:
-    name: Build & Test
-    runs-on: ubuntu-latest
+    name: Build & Test (${{ matrix.os }}, node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # We ship binaries for Linux, macOS and Windows, and the riskiest code —
+        # git plumbing driven by env vars, realpath containment, symlink handling
+        # — is exactly the kind that diverges per platform. Linux-only CI cannot
+        # see those breaks. The symlink-escape test in paths-safe.test.ts is
+        # skipped on Windows (needs Developer Mode) but runs on the other two.
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: [20]
+        # Cover the top of the range package.json claims to support.
+        include:
+          - os: ubuntu-latest
+            node: 22
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,8 +36,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ matrix.node }}
           cache: pnpm
+
+      # Integration tests build real git repositories in temp directories.
+      - name: Configure git identity
+        run: |
+          git config --global user.email "ci@crosscheck.invalid"
+          git config --global user.name "Crosscheck CI"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

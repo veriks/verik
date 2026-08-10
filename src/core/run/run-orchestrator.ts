@@ -19,10 +19,14 @@ import { selectContext } from '../context/context-selector.js';
 import { createProgress } from '../../cli/output/progress.js';
 import { printVerificationSeparator } from '../../cli/output/terminal.js';
 import { pruneOldRuns } from './run-pruner.js';
+import { resolveExit } from './exit-code.js';
 import type { RunFlags } from './run-context.js';
 import type { RunContext } from './run-context.js';
 
-const generateId = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz', 20);
+const generateId = customAlphabet(
+  '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz',
+  20,
+);
 
 export function generateRunId(): string {
   return `ccr_${generateId()}`;
@@ -47,9 +51,7 @@ export async function orchestrateRun(
     loadConfig(repoRoot),
     getOrCreateFingerprint(repoRoot, repoInfo.remote),
   ]);
-  const policy = flags.policyPath
-    ? await loadPolicy(flags.policyPath)
-    : await loadPolicy(repoRoot);
+  const policy = flags.policyPath ? await loadPolicy(flags.policyPath) : await loadPolicy(repoRoot);
 
   const runId = generateRunId();
   await ensureRunDir(repoRoot, runId);
@@ -85,7 +87,13 @@ export async function orchestrateRun(
     const abortController = new AbortController();
     let commandResult;
     try {
-      commandResult = await runCommand(wrappedCommand, cwd, repoRoot, runId, abortController.signal);
+      commandResult = await runCommand(
+        wrappedCommand,
+        cwd,
+        repoRoot,
+        runId,
+        abortController.signal,
+      );
     } catch (err) {
       throw new CommandSpawnError(`Failed to spawn command: ${String(err)}`);
     }
@@ -179,21 +187,29 @@ export async function orchestrateRun(
     await buildAndSaveReport(context, pipelineResult);
     await recordRun(context, pipelineResult);
 
+    const exit = resolveExit({
+      commandExitCode: commandResult.exitCode,
+      policy: pipelineResult.policy,
+      stageStatuses: pipelineResult.stageStatuses,
+      policyMode: policy.mode,
+    });
+
     const finalRecord = {
       ...record,
-      status: 'completed' as const,
+      status: exit.status,
       stageStatuses: pipelineResult.stageStatuses,
       errors: pipelineResult.errors,
     };
     await saveRunJson(repoRoot, runId, 'metadata.json', finalRecord);
+
+    if (exit.warning) logger.warn(exit.warning);
 
     // Prune old runs after writing — non-fatal, run silently.
     pruneOldRuns(repoRoot, config.runsToKeep).catch((err) =>
       logger.debug(`Run pruning failed (non-fatal): ${String(err)}`),
     );
 
-    const exitCode = pipelineResult.policy?.exitCode ?? commandResult.exitCode;
-    return { runId, exitCode, repoRoot, pipeline: pipelineResult };
+    return { runId, exitCode: exit.exitCode, repoRoot, pipeline: pipelineResult };
   } finally {
     await workspace.dispose();
   }

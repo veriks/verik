@@ -4,6 +4,7 @@ import type { JudgeOutput } from './judge-schema.js';
 import type { ScoutOutput } from '../scout/scout-schema.js';
 import type { BuilderOutput } from '../builder/builder-schema.js';
 import type { ReviewerOutput } from '../reviewer/reviewer-schema.js';
+import type { DeterministicFinding } from '../reviewer/deterministic-rules/index.js';
 
 export const JUDGE_PROMPT_VERSION = '0.1.0';
 
@@ -12,6 +13,8 @@ export interface JudgeInput {
   scout?: ScoutOutput;
   builder?: BuilderOutput;
   reviewer?: ReviewerOutput;
+  /** Rule output, not model output — the Judge must weigh these as fact. */
+  deterministicFindings?: DeterministicFinding[];
 }
 
 export class JudgeStage implements VerificationStage<JudgeInput, JudgeOutput> {
@@ -25,7 +28,13 @@ export class JudgeStage implements VerificationStage<JudgeInput, JudgeOutput> {
 
     const provider = await this.getProvider(context);
     const { buildJudgePrompt } = await import('./judge-prompt.js');
-    const prompt = buildJudgePrompt(scout, builder, reviewer, context.policy);
+    const prompt = buildJudgePrompt(
+      scout,
+      builder,
+      reviewer,
+      context.policy,
+      input.deterministicFindings ?? [],
+    );
 
     const { JudgeOutputSchema } = await import('./judge-schema.js');
     const result = await provider.generateStructured({
