@@ -70,6 +70,18 @@ crosscheck report
 crosscheck explain
 ```
 
+Or stop having to remember it — verify on every commit:
+
+```sh
+crosscheck hook install
+```
+
+Runs the deterministic rules (no API key, no network) before each `git commit`,
+and blocks only when your policy says to. An existing hook — husky, lint-staged,
+pre-commit — is preserved and still runs; `crosscheck hook uninstall` puts it
+back exactly as it was. A single commit can always skip it with
+`git commit --no-verify`.
+
 ## Commands
 
 | Command | Description |
@@ -77,6 +89,8 @@ crosscheck explain
 | `crosscheck init` | Create `.crosscheck/` with config and policy files |
 | `crosscheck run -- <cmd>` | Wrap and verify a command |
 | `crosscheck verify` | Verify the current uncommitted diff (no command) |
+| `crosscheck begin` | Mark a baseline, for agents that can't be wrapped |
+| `crosscheck hook install` | Verify on every `git commit` |
 | `crosscheck report [run-id]` | Print the latest (or specific) report |
 | `crosscheck explain [run-id]` | Explain the latest verdict in plain English |
 | `crosscheck status` | Show repository and Crosscheck status |

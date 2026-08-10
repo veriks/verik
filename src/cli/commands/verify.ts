@@ -30,6 +30,10 @@ export function buildVerifyCommand(): Command {
       '--base <ref>',
       'Verify the range <ref>..HEAD instead of uncommitted changes (for CI, where the checkout is clean)',
     )
+    .option(
+      '--mode <mode>',
+      'Override the configured verification mode: rules (deterministic only, no API key) or full',
+    )
     .action(async (options: Record<string, string | boolean>) => {
       try {
         const cwd = process.cwd();
@@ -40,6 +44,17 @@ export function buildVerifyCommand(): Command {
           getOrCreateFingerprint(root, info.remote),
         ]);
         const policy = await loadPolicy(root);
+
+        // The git hook forces `rules` this way: full mode calls the API on every
+        // commit, which is neither fast enough nor cheap enough to sit in front
+        // of `git commit`.
+        const modeOverride = options['mode'] as string | undefined;
+        if (modeOverride) {
+          if (modeOverride !== 'rules' && modeOverride !== 'full') {
+            throw new Error(`Unknown mode "${modeOverride}". Expected "rules" or "full".`);
+          }
+          config.mode = modeOverride;
+        }
 
         // An explicit checkpoint beats HEAD: it is the only baseline that can
         // separate an unwrappable agent's work from the developer's own. An

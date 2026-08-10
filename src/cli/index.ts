@@ -13,6 +13,7 @@ import { buildOverrideCommand } from './commands/override.js';
 import { buildDoctorCommand } from './commands/doctor.js';
 import { buildDryRunCommand } from './commands/dry-run.js';
 import { buildBeginCommand } from './commands/begin.js';
+import { buildHookCommand } from './commands/hook.js';
 import { banner } from './output/theme.js';
 
 const VERSION = '0.1.0';
@@ -42,6 +43,7 @@ Examples:
 program.addCommand(buildRunCommand());
 program.addCommand(buildDryRunCommand());
 program.addCommand(buildBeginCommand());
+program.addCommand(buildHookCommand());
 program.addCommand(buildInitCommand());
 program.addCommand(buildDoctorCommand());
 program.addCommand(buildStatusCommand());
