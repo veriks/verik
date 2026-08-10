@@ -34,9 +34,36 @@ export const ModelsConfigSchema = z.object({
   judge: z.string().default('claude-opus-5'),
 });
 
+export const ProviderIdSchema = z.enum([
+  'anthropic',
+  'openai',
+  'openrouter',
+  'google',
+  'mistral',
+  'deepseek',
+  'groq',
+  'together',
+  'fireworks',
+  'huggingface',
+  'ollama',
+  'custom',
+]);
+
+/**
+ * How much of the pipeline runs.
+ *
+ * `rules` needs no API key at all — the deterministic rules and the Builder are
+ * plain code — so it stays useful for anyone who has not set one up. `full`
+ * adds the Scout/Reviewer/Judge inference stages.
+ */
+export const VerificationModeSchema = z.enum(['rules', 'full']);
+
 export const CrosscheckConfigSchema = z.object({
   version: z.literal(1),
-  provider: z.string().default('anthropic'),
+  provider: ProviderIdSchema.default('anthropic'),
+  /** Overrides the provider's default endpoint. Required for `custom`. */
+  baseUrl: z.string().optional(),
+  mode: VerificationModeSchema.default('full'),
   models: ModelsConfigSchema.default({}),
   builder: BuilderConfigSchema.default({}),
   verification: VerificationConfigSchema.default({}),

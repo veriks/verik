@@ -8,13 +8,12 @@ import { ensureRunDir, saveRunJson } from '../../storage/local-run-store.js';
 import type { RunContext, RunFlags } from '../../core/run/run-context.js';
 import { runVerificationPipeline } from '../../core/pipeline/verification-pipeline.js';
 import { buildAndSaveReport } from '../../core/reports/report-builder.js';
-import { runDir } from '../../storage/paths.js';
-import { join } from 'node:path';
 import { getOrCreateFingerprint } from '../../core/repository/repo-fingerprint.js';
 import { VerificationCache } from '../../core/cache/verification-cache.js';
 import { selectContext } from '../../core/context/context-selector.js';
 import { createProgress } from '../output/progress.js';
 import { resolveExit } from '../../core/run/exit-code.js';
+import { printChanges, printHeader, printVerdictSummary } from '../output/terminal.js';
 
 export function buildVerifyCommand(): Command {
   return new Command('verify')
@@ -110,15 +109,19 @@ export function buildVerifyCommand(): Command {
           policy: pipeline.policy,
           stageStatuses: pipeline.stageStatuses,
           policyMode: policy.mode,
+          mode: config.mode,
         });
         await saveRunJson(root, runId, 'metadata.json', { ...record, status: exit.status });
 
         const verdict = pipeline.judge?.verdict ?? 'inconclusive';
         if (!flags.quiet) {
-          console.log(`Verdict: ${verdict.toUpperCase()}`);
-          if (pipeline.judge) console.log(pipeline.judge.summary);
-          const reportPath = join(runDir(root, runId), 'report.md');
-          console.log('\nFull report:', reportPath);
+          // The shared renderer, not a local one-liner. The previous version
+          // printed only "Verdict: INCONCLUSIVE" and dropped every finding —
+          // so a critical secret-leak rule could fire and the user would never
+          // see it, which is the worst possible failure for this tool.
+          printHeader(runId);
+          printChanges(diff.additions, diff.deletions, diff.changedFiles.length);
+          printVerdictSummary(pipeline, { runId, exitCode: 0, repoRoot: root }, flags.intent);
         }
         if (flags.json) {
           console.log(JSON.stringify({ runId, verdict, policy: pipeline.policy }));
