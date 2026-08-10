@@ -85,8 +85,13 @@ export class LiveRegion {
 
   render(content: string[]): void {
     this.clear();
-    process.stdout.write(content.join('\n') + '\n');
-    this.lines = content.length;
+    const text = content.join('\n');
+    process.stdout.write(text + '\n');
+    // Count the lines actually printed, not the array length. An entry
+    // containing an embedded newline occupies two rows, and counting the array
+    // would rewind one row short on every redraw — making the whole block creep
+    // upward one line per keypress.
+    this.lines = text.split('\n').length;
   }
 
   clear(): void {
