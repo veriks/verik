@@ -45,14 +45,31 @@ Four claims, in the order they matter.
 
 ### Provenance — what the agent touched
 
-Crosscheck snapshots the repository as a git tree before the wrapped command
-runs and again after, then diffs the two trees. The result is the **attributable
-diff**: the agent's contribution, isolated from work that was already in
-progress, down to the hunk. A file you had half-edited before the agent touched
-it yields only the agent's delta, not yours.
+Crosscheck snapshots the repository as a git tree before the agent works and
+again after, then diffs the two trees. The result is the **attributable diff**:
+the agent's contribution, isolated from work that was already in progress, down
+to the hunk. A file you had half-edited before the agent touched it yields only
+the agent's delta — your line appears as context, not as an addition.
 
 This is the hardest engineering in the product and the least replaceable. It is
 pure git plumbing — no model involved, nothing to be wrong about.
+
+**How the baseline is obtained depends on how the agent runs:**
+
+| Agent | Command | Baseline |
+|---|---|---|
+| One-shot CLI (`claude -p`, `codex exec`, `aider --message`) | `crosscheck run -- <cmd>` | Taken automatically around the command |
+| Interactive CLI session (`claude`, `aider`) | `crosscheck run -- claude` | Around the whole session — coarser, still exact |
+| IDE agents (Cursor, Copilot, Windsurf) | `crosscheck begin` … `crosscheck verify` | Explicit checkpoint |
+| Desktop and web apps, pasted code | `crosscheck begin` … `crosscheck verify` | Explicit checkpoint |
+| CI, on a pull request | `crosscheck verify --base <ref>` | The merge base |
+
+The checkpoint matters more than it looks: without it, an unwrappable agent
+degrades to "everything uncommitted", which cannot separate the agent's work
+from the developer's — and IDE agents are plausibly the largest segment. The
+checkpoint tree is a real git tree in Crosscheck's own object store, so
+attribution is identical in kind to the wrapped path. The repository is never
+written to.
 
 ### Evidence — what was checked
 

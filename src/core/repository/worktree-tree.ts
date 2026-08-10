@@ -1,6 +1,6 @@
 import { mkdtemp, mkdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { delimiter, join, resolve } from 'node:path';
 import { execa } from 'execa';
 import { logger } from '../../shared/logger.js';
 
@@ -56,6 +56,8 @@ export interface TreeWorkspace {
   objectDir: string;
   /** The repository's real object store, kept readable via alternates. */
   repoObjectDir: string;
+  /** Extra stores made readable — e.g. the durable checkpoint store. */
+  extraAlternates: string[];
   dispose(): Promise<void>;
 }
 
@@ -81,7 +83,10 @@ function scopedEnv(ws: TreeWorkspace, indexLabel: string): Record<string, string
     ...inheritedEnv(),
     GIT_INDEX_FILE: join(ws.dir, `${indexLabel}.index`),
     GIT_OBJECT_DIRECTORY: ws.objectDir,
-    GIT_ALTERNATE_OBJECT_DIRECTORIES: ws.repoObjectDir,
+    // Multiple alternates are separated by the platform's path delimiter — ':'
+    // on POSIX, ';' on Windows. Hardcoding either silently makes the second
+    // store unreadable on the other platform.
+    GIT_ALTERNATE_OBJECT_DIRECTORIES: [ws.repoObjectDir, ...ws.extraAlternates].join(delimiter),
     GIT_OPTIONAL_LOCKS: '0',
     GIT_TERMINAL_PROMPT: '0',
   };
@@ -114,7 +119,10 @@ function scoped(
  * command runs and read back afterwards, so this must not be disposed until the
  * whole run is over.
  */
-export async function createTreeWorkspace(root: string): Promise<TreeWorkspace> {
+export async function createTreeWorkspace(
+  root: string,
+  extraAlternates: string[] = [],
+): Promise<TreeWorkspace> {
   // `--git-path` rather than join(root, '.git', 'objects'): under linked
   // worktrees and submodules `.git` is a file, not a directory. Resolved to an
   // absolute path because alternates are read relative to the child's cwd.
@@ -129,10 +137,59 @@ export async function createTreeWorkspace(root: string): Promise<TreeWorkspace> 
     dir,
     objectDir,
     repoObjectDir,
+    extraAlternates,
     dispose: async () => {
       await rm(dir, { recursive: true, force: true }).catch(() => {});
     },
   };
+}
+
+/**
+ * A durable object store owned by Crosscheck, at `.crosscheck/objects`.
+ *
+ * A checkpoint tree has to survive long after the process that wrote it — the
+ * user may spend an hour prompting an IDE agent between `begin` and `verify` —
+ * so it cannot live in the temp workspace. Writing it into `.git/objects` would
+ * be simpler but breaks the invariant that Crosscheck never mutates the
+ * repository, so it gets its own store and is registered as a git alternate
+ * when reading.
+ */
+export async function ensureCheckpointStore(root: string): Promise<string> {
+  const dir = join(root, '.crosscheck', 'objects');
+  await mkdir(join(dir, 'info'), { recursive: true });
+  await mkdir(join(dir, 'pack'), { recursive: true });
+  return dir;
+}
+
+/**
+ * Writes a tree describing the working tree right now into the durable store.
+ * Returns the tree oid, which is all a later `verify` needs.
+ */
+export async function writeCheckpointTree(
+  root: string,
+  includeUntracked: boolean,
+): Promise<string> {
+  const objectDir = await ensureCheckpointStore(root);
+  const raw = (await git(root, inheritedEnv(), ['rev-parse', '--git-path', 'objects'])).trim();
+  const repoObjectDir = resolve(root, raw);
+  const dir = await mkdtemp(join(tmpdir(), 'crosscheck-ckpt-'));
+
+  // Objects go to the durable store; the index is throwaway.
+  const ws: TreeWorkspace = {
+    dir,
+    objectDir,
+    repoObjectDir,
+    extraAlternates: [],
+    dispose: async () => {
+      await rm(dir, { recursive: true, force: true }).catch(() => {});
+    },
+  };
+
+  try {
+    return await buildWorktreeTree(root, ws, 'checkpoint', includeUntracked);
+  } finally {
+    await ws.dispose();
+  }
 }
 
 /**
