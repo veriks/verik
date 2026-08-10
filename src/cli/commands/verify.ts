@@ -15,7 +15,7 @@ import { VerificationCache } from '../../core/cache/verification-cache.js';
 import { selectContext } from '../../core/context/context-selector.js';
 import { createProgress } from '../output/progress.js';
 import { resolveExit } from '../../core/run/exit-code.js';
-import { readCheckpoint, isStale } from '../../core/repository/checkpoint.js';
+import { readCheckpoint, isStale, commitsSince } from '../../core/repository/checkpoint.js';
 import { ensureCheckpointStore } from '../../core/repository/worktree-tree.js';
 import { subtle, warn } from '../output/theme.js';
 import { printChanges, printHeader, printVerdictSummary } from '../output/terminal.js';
@@ -61,14 +61,27 @@ export function buildVerifyCommand(): Command {
         // explicit --base still wins, since that is a deliberate instruction.
         const baseRef = options['base'] as string | undefined;
         const checkpoint = baseRef ? null : await readCheckpoint(root);
-        if (checkpoint && isStale(checkpoint, info.branch, info.commitSha)) {
+        const stale = checkpoint ? await isStale(root, checkpoint, info.commitSha) : false;
+        if (checkpoint && stale) {
           console.error(
-            `${warn('!')} Checkpoint was taken on ${checkpoint.branch}@${checkpoint.commitSha.slice(0, 8)} — ignoring it and diffing against HEAD.`,
+            `${warn('!')} Checkpoint from ${checkpoint.branch}@${checkpoint.commitSha.slice(0, 8)} is not an ancestor of HEAD — diffing against HEAD instead.`,
           );
           console.error(subtle('  Run crosscheck begin again to re-baseline.'));
         }
-        const usable =
-          checkpoint && !isStale(checkpoint, info.branch, info.commitSha) ? checkpoint : null;
+        const usable = checkpoint && !stale ? checkpoint : null;
+
+        // Commits made after `begin` are part of the agent's work and are
+        // included. Saying so avoids the diff looking inexplicably large.
+        if (usable) {
+          const n = await commitsSince(root, usable);
+          if (n > 0) {
+            console.error(
+              subtle(
+                `  Baseline: checkpoint from ${usable.branch}@${usable.commitSha.slice(0, 8)}, ${n} commit(s) ago — those commits are included.`,
+              ),
+            );
+          }
+        }
 
         const { snapshot, diff } = await computeWorktreeDiff({
           root,

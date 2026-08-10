@@ -8,6 +8,7 @@ import { getRepositoryInfo } from '../../core/repository/git-repository.js';
 import { captureSnapshot } from '../../core/repository/repository-snapshot.js';
 import { computeDiff, type DiffResult } from '../../core/repository/diff-capture.js';
 import { createTreeWorkspace } from '../../core/repository/worktree-tree.js';
+import { writeCheckpoint, isStale, commitsSince } from '../../core/repository/checkpoint.js';
 
 // git returns forward-slash paths on all platforms; normalise for assertions.
 const norm = (p: string) => p.replace(/\\/g, '/');
@@ -275,5 +276,55 @@ describe('getRepositoryInfo', () => {
     await repo.write('README.md', '# dirty');
     const dirty = await getRepositoryInfo(repo.root);
     expect(dirty.isDirty).toBe(true);
+  });
+});
+
+describe('checkpoint staleness', () => {
+  it('survives commits made after the checkpoint — the agent committing is the point', async () => {
+    // Found on a real repository: `begin`, two commits by the agent, then
+    // `verify` reported "No changes to verify" because any commit invalidated
+    // the baseline. Agents commit; discarding the baseline when they do made
+    // their work invisible.
+    repo = await createTestRepo();
+    await initWithCommit(repo, 'src/a.ts', 'export const a = 1;');
+    const info = await getRepositoryInfo(repo.root);
+    const cp = await writeCheckpoint(repo.root, info.branch, info.commitSha, true);
+
+    await repo.write('src/a.ts', 'export const a = 2;');
+    await repo.commit('agent commit one');
+    await repo.write('src/b.ts', 'export const b = 1;');
+    await repo.commit('agent commit two');
+
+    const after = await getRepositoryInfo(repo.root);
+    expect(await isStale(repo.root, cp, after.commitSha)).toBe(false);
+    expect(await commitsSince(repo.root, cp)).toBe(2);
+  });
+
+  it('is stale when HEAD moved sideways onto unrelated history', async () => {
+    repo = await createTestRepo();
+    await initWithCommit(repo, 'src/a.ts', 'export const a = 1;');
+    const info = await getRepositoryInfo(repo.root);
+    const cp = await writeCheckpoint(repo.root, info.branch, info.commitSha, true);
+
+    // An orphan branch shares no ancestry, so the baseline is genuinely junk.
+    // Driven with git directly: simple-git's unsafe-operations plugin refuses
+    // an orphan checkout, so going through it would silently leave us on the
+    // original branch and quietly assert nothing.
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    await promisify(execFile)('git', ['-C', repo.root, 'checkout', '--orphan', 'unrelated']);
+    await repo.write('src/other.ts', 'export const o = 1;');
+    await repo.commit('unrelated root commit');
+
+    const after = await getRepositoryInfo(repo.root);
+    expect(await isStale(repo.root, cp, after.commitSha)).toBe(true);
+  });
+
+  it('is not stale when nothing has moved at all', async () => {
+    repo = await createTestRepo();
+    await initWithCommit(repo, 'src/a.ts', 'export const a = 1;');
+    const info = await getRepositoryInfo(repo.root);
+    const cp = await writeCheckpoint(repo.root, info.branch, info.commitSha, true);
+    expect(await isStale(repo.root, cp, info.commitSha)).toBe(false);
   });
 });
