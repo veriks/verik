@@ -3,13 +3,10 @@ import type { RunContext } from '../../core/run/run-context.js';
 import type { ReviewerOutput } from './reviewer-schema.js';
 import type { ScoutOutput } from '../scout/scout-schema.js';
 import type { BuilderOutput } from '../builder/builder-schema.js';
-import { runDeterministicRules } from './deterministic-rules/index.js';
-import { getRecentFindings, getActiveOverrides } from '../../core/memory/memory-store.js';
+import type { DeterministicPass } from './deterministic-pass.js';
+import { getRecentFindings } from '../../core/memory/memory-store.js';
 import type { StoredFinding } from '../../core/memory/memory-schema.js';
-import {
-  applyOverridesToDeterministic,
-  applyOverridesToLlmFindings,
-} from '../../core/policy/override-engine.js';
+import { applyOverridesToLlmFindings } from '../../core/policy/override-engine.js';
 import { logger } from '../../shared/logger.js';
 
 export const REVIEWER_PROMPT_VERSION = '0.1.0';
@@ -18,6 +15,8 @@ export interface ReviewerInput {
   context: RunContext;
   scout?: ScoutOutput;
   builder?: BuilderOutput;
+  /** Run by the pipeline, so these survive a Reviewer failure. */
+  deterministic: DeterministicPass;
 }
 
 export class ReviewerStage implements VerificationStage<ReviewerInput, ReviewerOutput> {
@@ -27,33 +26,12 @@ export class ReviewerStage implements VerificationStage<ReviewerInput, ReviewerO
     input: ReviewerInput,
     _context: RunContext,
   ): Promise<StageOutputWithMeta<ReviewerOutput>> {
-    const { context, scout, builder } = input;
+    const { context, scout, builder, deterministic } = input;
     const { diff } = context;
 
-    // Load active overrides once — used to suppress both deterministic and LLM findings.
-    let activeOverrides: import('../../core/memory/memory-schema.js').Override[] = [];
-    try {
-      activeOverrides = await getActiveOverrides(context.repoRoot);
-      if (activeOverrides.length) {
-        logger.debug(`${activeOverrides.length} active override(s) loaded`);
-      }
-    } catch (err) {
-      logger.debug(`Could not load overrides: ${String(err)}`);
-    }
-
-    // Run deterministic rules, then filter suppressed ones before they reach the LLM prompt.
-    const rawDeterministicFindings = diff
-      ? await runDeterministicRules({ diff, patch: diff.patch })
-      : [];
-
-    const { kept: deterministicFindings, suppressed: suppressedDeterministic } =
-      applyOverridesToDeterministic(rawDeterministicFindings, activeOverrides);
-
-    if (suppressedDeterministic.length) {
-      logger.debug(
-        `Suppressed ${suppressedDeterministic.length} deterministic finding(s) via overrides`,
-      );
-    }
+    const activeOverrides = deterministic.overrides;
+    const deterministicFindings = deterministic.findings;
+    const suppressedDeterministic = deterministic.suppressed;
 
     // Query memory for historical findings on the changed files.
     const historicalFindings: StoredFinding[] = [];

@@ -4,6 +4,7 @@ import { getRepositoryInfo } from '../../core/repository/git-repository.js';
 import { listRunIds } from '../../storage/local-run-store.js';
 import { runFilePath } from '../../storage/paths.js';
 import type { JudgeOutput } from '../../stages/judge/judge-schema.js';
+import { box, brand, section, severityTint, subtle, verdictTint } from '../output/theme.js';
 
 export function buildExplainCommand(): Command {
   return new Command('explain')
@@ -39,24 +40,37 @@ export function buildExplainCommand(): Command {
             return;
           }
 
-          console.log(`Verdict: ${judge.verdict.toUpperCase()} (${Math.round(judge.confidence * 100)}% confidence)`);
-          console.log('');
-          console.log(judge.summary);
+          console.log();
+          for (const line of box(
+            judge.verdict.toUpperCase(),
+            judge.summary,
+            verdictTint(judge.verdict),
+          )) {
+            console.log(line);
+          }
+          console.log(subtle(`  ${Math.round(judge.confidence * 100)}% confidence · ${id}\n`));
 
           if (judge.reasons.length) {
-            console.log('\nReasons:');
+            console.log(section('reasons'));
             for (const r of judge.reasons) {
-              console.log(`  [${r.severity.toUpperCase()}] ${r.title}`);
+              const tint = severityTint(r.severity);
+              console.log(`${tint('▊')} ${tint(r.severity.toUpperCase().padEnd(8))}${r.title}`);
             }
+            console.log();
           }
 
           if (judge.requiredActions.length) {
-            console.log('\nRequired actions:');
-            for (const a of judge.requiredActions) console.log(`  - ${a}`);
+            console.log(section('required actions'));
+            for (const a of judge.requiredActions) console.log(`  ${brand('→')} ${a}`);
+            console.log();
           }
 
           if (judge.dismissedFindings.length) {
-            console.log(`\n${judge.dismissedFindings.length} finding(s) dismissed as unsupported.`);
+            console.log(
+              subtle(
+                `${judge.dismissedFindings.length} finding(s) dismissed as unsupported by the Judge.\n`,
+              ),
+            );
           }
         } catch {
           console.log(`No judge output found for run ${id}.`);

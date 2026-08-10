@@ -1,0 +1,23 @@
+version: 2
+
+# Crosscheck is installed globally and runs in CI with ANTHROPIC_API_KEY in the
+# environment, so a compromised transitive dependency is a direct path to a
+# user's source code and their key. Dependency freshness is a security control
+# here, not housekeeping.
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # One PR for routine bumps; security advisories still arrive separately
+      # and immediately via Dependabot alerts.
+      dev-dependencies:
+        dependency-type: development
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

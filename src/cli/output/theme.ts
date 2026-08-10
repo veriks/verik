@@ -116,6 +116,19 @@ export function banner(): string {
   ].join('\n');
 }
 
+/** A labelled section heading, matching the FINDINGS/RULES blocks in a run. */
+export function section(title: string): string {
+  return muted(title.toUpperCase());
+}
+
+/**
+ * Aligned label/value row. Padding is applied to the raw label before colour,
+ * since escape codes have no display width.
+ */
+export function kv(label: string, value: string, width = 12): string {
+  return `  ${muted(label.padEnd(width))}${value}`;
+}
+
 /** Full-width rule, optionally labelled. */
 export function rule(label?: string): string {
   const w = frameWidth();
