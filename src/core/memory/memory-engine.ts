@@ -66,6 +66,34 @@ export async function recordRun(context: RunContext, pipeline: PipelineResult): 
         });
       }
     }
+
+    // Deterministic findings are persisted unconditionally: they are rule
+    // output, they exist even when the Reviewer or Judge stage failed, and
+    // memory is what lets a later run say "this file had this problem before".
+    for (const finding of pipeline.deterministicFindings) {
+      await saveFinding(repoRoot, {
+        runId: record.runId,
+        repositoryPath: record.repositoryPath,
+        repositoryRemote: record.repositoryRemote,
+        branch: record.branch,
+        commitSha: record.baselineCommitSha,
+        timestamp: record.startedAt,
+        ruleId: finding.ruleId,
+        title: finding.title,
+        category: 'correctness',
+        severity: finding.severity,
+        confidence: finding.confidence,
+        filePath: finding.file,
+        startLine: finding.line,
+        summary: finding.message,
+        recommendation: finding.remediation,
+        // 'inconclusive' when the Judge never ran — the rule still fired.
+        judgeVerdict: judge?.verdict ?? 'inconclusive',
+        // A rule firing is a fact, not a claim the Judge adjudicates.
+        judgeDisposed: 'confirmed',
+        escaped: false,
+      });
+    }
   } catch (err) {
     // Memory errors must never fail a run
     logger.warn(`Memory recording failed (non-fatal): ${String(err)}`);
