@@ -8,6 +8,8 @@ import type { StageRunStatus } from '../run/run-state.js';
 import type { StageMetadata } from '../../shared/schemas.js';
 import { runStage } from './stage.js';
 import { logger } from '../../shared/logger.js';
+import { runDeterministicPass } from '../../stages/reviewer/deterministic-pass.js';
+import type { DeterministicFinding } from '../../stages/reviewer/deterministic-rules/index.js';
 
 export interface PipelineResult {
   scout?: ScoutOutput;
@@ -15,6 +17,12 @@ export interface PipelineResult {
   reviewer?: ReviewerOutput;
   judge?: JudgeOutput;
   policy?: PolicyResult;
+  /**
+   * Deterministic rule findings. Kept separate from `reviewer.findings` so they
+   * survive a Reviewer failure and can outrank model opinion, per the
+   * "deterministic evidence takes precedence" invariant.
+   */
+  deterministicFindings: DeterministicFinding[];
   stageStatuses: Partial<Record<'scout' | 'builder' | 'reviewer' | 'judge', StageRunStatus>>;
   stageMetadata: Partial<Record<'scout' | 'builder' | 'reviewer' | 'judge', StageMetadata>>;
   errors: string[];
@@ -29,8 +37,10 @@ export async function runVerificationPipeline(context: RunContext): Promise<Pipe
   const p = context.progress;
 
   const errors: string[] = [];
-  const stageStatuses: Partial<Record<'scout' | 'builder' | 'reviewer' | 'judge', StageRunStatus>> = {};
-  const stageMetadata: Partial<Record<'scout' | 'builder' | 'reviewer' | 'judge', StageMetadata>> = {};
+  const stageStatuses: Partial<Record<'scout' | 'builder' | 'reviewer' | 'judge', StageRunStatus>> =
+    {};
+  const stageMetadata: Partial<Record<'scout' | 'builder' | 'reviewer' | 'judge', StageMetadata>> =
+    {};
   let scout: ScoutOutput | undefined;
   let builder: BuilderOutput | undefined;
   let reviewer: ReviewerOutput | undefined;
@@ -69,9 +79,10 @@ export async function runVerificationPipeline(context: RunContext): Promise<Pipe
         p.cached('Builder');
       } else {
         stageStatuses.builder = 'completed';
-        const summary = builder.overallStatus === 'failed'
-          ? `${builder.evidence.length} failure(s)`
-          : builder.overallStatus;
+        const summary =
+          builder.overallStatus === 'failed'
+            ? `${builder.evidence.length} failure(s)`
+            : builder.overallStatus;
         p.succeed('Builder', builderResult.metadata.durationMs, summary);
       }
     } else {
@@ -84,17 +95,34 @@ export async function runVerificationPipeline(context: RunContext): Promise<Pipe
     p.skip('Builder', '--no-builder flag');
   }
 
+  // Deterministic rules run before the Reviewer and outside it, so their
+  // findings reach the Judge and the report even if the Reviewer's LLM call fails.
+  const deterministic = await runDeterministicPass(context);
+  if (deterministic.findings.length) {
+    logger.debug(`${deterministic.findings.length} deterministic finding(s)`);
+  }
+
   // Reviewer
   stageStatuses.reviewer = 'running';
   p.start('Reviewer', 'analysing for correctness and security…');
-  const reviewerResult = await runStage(new ReviewerStage(), { context, scout, builder }, context);
+  const reviewerResult = await runStage(
+    new ReviewerStage(),
+    { context, scout, builder, deterministic },
+    context,
+  );
   stageMetadata.reviewer = reviewerResult.metadata;
   if (reviewerResult.metadata.status === 'completed') {
     reviewer = reviewerResult.output;
     stageStatuses.reviewer = 'completed';
     const n = reviewer.findings.length;
-    const high = reviewer.findings.filter((f) => f.severity === 'high' || f.severity === 'critical').length;
-    p.succeed('Reviewer', reviewerResult.metadata.durationMs, `${n} finding(s)${high ? `, ${high} high` : ''}`);
+    const high = reviewer.findings.filter(
+      (f) => f.severity === 'high' || f.severity === 'critical',
+    ).length;
+    p.succeed(
+      'Reviewer',
+      reviewerResult.metadata.durationMs,
+      `${n} finding(s)${high ? `, ${high} high` : ''}`,
+    );
   } else {
     stageStatuses.reviewer = 'failed';
     errors.push(`Reviewer failed: ${reviewerResult.metadata.error ?? 'unknown error'}`);
@@ -104,12 +132,20 @@ export async function runVerificationPipeline(context: RunContext): Promise<Pipe
   // Judge
   stageStatuses.judge = 'running';
   p.start('Judge', 'weighing evidence…');
-  const judgeResult = await runStage(new JudgeStage(), { context, scout, builder, reviewer }, context);
+  const judgeResult = await runStage(
+    new JudgeStage(),
+    { context, scout, builder, reviewer, deterministicFindings: deterministic.findings },
+    context,
+  );
   stageMetadata.judge = judgeResult.metadata;
   if (judgeResult.metadata.status === 'completed') {
     judge = judgeResult.output;
     stageStatuses.judge = judge.verdict === 'inconclusive' ? 'inconclusive' : 'completed';
-    p.succeed('Judge', judgeResult.metadata.durationMs, `${judge.verdict.toUpperCase()} · ${Math.round(judge.confidence * 100)}% confidence`);
+    p.succeed(
+      'Judge',
+      judgeResult.metadata.durationMs,
+      `${judge.verdict.toUpperCase()} · ${Math.round(judge.confidence * 100)}% confidence`,
+    );
   } else {
     stageStatuses.judge = 'failed';
     errors.push(`Judge failed: ${judgeResult.metadata.error ?? 'unknown error'}`);
@@ -120,5 +156,15 @@ export async function runVerificationPipeline(context: RunContext): Promise<Pipe
     policy = evaluatePolicy(judge, context.policy);
   }
 
-  return { scout, builder, reviewer, judge, policy, stageStatuses, stageMetadata, errors };
+  return {
+    scout,
+    builder,
+    reviewer,
+    judge,
+    policy,
+    deterministicFindings: deterministic.findings,
+    stageStatuses,
+    stageMetadata,
+    errors,
+  };
 }

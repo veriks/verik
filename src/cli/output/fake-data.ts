@@ -92,6 +92,7 @@ export function buildFakePipeline(): PipelineResult {
   const now = new Date();
   const ts = (offsetMs: number) => new Date(now.getTime() - offsetMs).toISOString();
   return {
+    deterministicFindings: [],
     stageStatuses: {
       scout: 'completed',
       builder: 'completed',
@@ -99,10 +100,40 @@ export function buildFakePipeline(): PipelineResult {
       judge: 'completed',
     },
     stageMetadata: {
-      scout:    { startedAt: ts(11624), completedAt: ts(11203), durationMs: 421,  status: 'completed', model: 'claude-sonnet-4-6', provider: 'anthropic', promptVersion: '0.1.0' },
-      builder:  { startedAt: ts(10800), completedAt: ts(5588),  durationMs: 5212, status: 'completed', fromCache: false },
-      reviewer: { startedAt: ts(5500),  completedAt: ts(2396),  durationMs: 3104, status: 'completed', model: 'claude-sonnet-4-6', provider: 'anthropic', promptVersion: '0.1.0' },
-      judge:    { startedAt: ts(2200),  completedAt: ts(1313),  durationMs: 887,  status: 'completed', model: 'claude-sonnet-4-6', provider: 'anthropic', promptVersion: '0.1.0' },
+      scout: {
+        startedAt: ts(11624),
+        completedAt: ts(11203),
+        durationMs: 421,
+        status: 'completed',
+        model: 'claude-sonnet-4-6',
+        provider: 'anthropic',
+        promptVersion: '0.1.0',
+      },
+      builder: {
+        startedAt: ts(10800),
+        completedAt: ts(5588),
+        durationMs: 5212,
+        status: 'completed',
+        fromCache: false,
+      },
+      reviewer: {
+        startedAt: ts(5500),
+        completedAt: ts(2396),
+        durationMs: 3104,
+        status: 'completed',
+        model: 'claude-sonnet-4-6',
+        provider: 'anthropic',
+        promptVersion: '0.1.0',
+      },
+      judge: {
+        startedAt: ts(2200),
+        completedAt: ts(1313),
+        durationMs: 887,
+        status: 'completed',
+        model: 'claude-sonnet-4-6',
+        provider: 'anthropic',
+        promptVersion: '0.1.0',
+      },
     },
     scout: {
       changeSummary:
@@ -119,9 +150,21 @@ export function buildFakePipeline(): PipelineResult {
         'Token lifecycle handling present',
       ],
       files: [
-        { path: 'src/auth/reset.ts', role: 'Password reset request and validation logic', importance: 'critical' },
-        { path: 'src/db/migrations/20260801_add_reset_tokens.sql', role: 'Schema migration for reset_tokens table', importance: 'high' },
-        { path: 'src/routes/auth.ts', role: 'Express route handlers for reset flow', importance: 'high' },
+        {
+          path: 'src/auth/reset.ts',
+          role: 'Password reset request and validation logic',
+          importance: 'critical',
+        },
+        {
+          path: 'src/db/migrations/20260801_add_reset_tokens.sql',
+          role: 'Schema migration for reset_tokens table',
+          importance: 'high',
+        },
+        {
+          path: 'src/routes/auth.ts',
+          role: 'Express route handlers for reset flow',
+          importance: 'high',
+        },
       ],
       builderRecommendations: [
         'TypeScript compilation should be checked',
@@ -154,7 +197,8 @@ export function buildFakePipeline(): PipelineResult {
           status: 'failed',
           exitCode: 1,
           durationMs: 5212,
-          stdoutTail: 'PASS src/auth/login.test.ts\nFAIL src/auth/reset.test.ts\n  ● rejects reuse of reset token\n    Expected: 401\n    Received: 200',
+          stdoutTail:
+            'PASS src/auth/login.test.ts\nFAIL src/auth/reset.test.ts\n  ● rejects reuse of reset token\n    Expected: 401\n    Received: 200',
           stderrTail: '',
         },
         {
@@ -222,12 +266,13 @@ export function buildFakePipeline(): PipelineResult {
               path: 'src/routes/auth.ts',
               startLine: 34,
               endLine: 41,
-              excerpt: 'router.post(\'/reset/request\', resetController.request)',
+              excerpt: "router.post('/reset/request', resetController.request)",
               explanation: 'No rate-limit middleware present on this route.',
             },
           ],
           builderEvidenceRefs: [],
-          recommendation: 'Apply rate limiting (e.g. `express-rate-limit`) to the reset request endpoint.',
+          recommendation:
+            'Apply rate limiting (e.g. `express-rate-limit`) to the reset request endpoint.',
           blockingCandidate: false,
         },
         {
@@ -244,14 +289,12 @@ export function buildFakePipeline(): PipelineResult {
               path: 'src/auth/reset.ts',
               startLine: 22,
               endLine: 30,
-              excerpt:
-                'if (!user) return res.status(404).json({ error: \'Email not found\' })',
+              excerpt: "if (!user) return res.status(404).json({ error: 'Email not found' })",
               explanation: 'A 404 with a distinct message confirms the email is not registered.',
             },
           ],
           builderEvidenceRefs: [],
-          recommendation:
-            'Return the same 200 response regardless of whether the email exists.',
+          recommendation: 'Return the same 200 response regardless of whether the email exists.',
           blockingCandidate: false,
         },
       ],
@@ -345,7 +388,12 @@ export function buildFakeContext(record: RunRecord): RunContext {
       diff: FAKE_SAFE.patch,
       changedFiles: [],
       manifestFiles: [],
-      tokenBudget: { totalTokens: 60_000, usedTokens: 0, remainingTokens: 60_000, truncated: false },
+      tokenBudget: {
+        totalTokens: 60_000,
+        usedTokens: 0,
+        remainingTokens: 60_000,
+        truncated: false,
+      },
       limitations: [],
     },
     cache: new VerificationCache(process.cwd()),

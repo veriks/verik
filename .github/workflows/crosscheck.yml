@@ -22,14 +22,18 @@ jobs:
         run: npm install -g crosscheck
         # Or pin a version: npm install -g crosscheck@0.1.0
 
-      - name: Initialize
-        run: crosscheck init
+      # No `crosscheck init` here. It writes .crosscheck/ into the working tree,
+      # which would then be the only thing an uncommitted-changes verify could see.
+      # Config and policy are read from the repo if committed, else defaults apply.
 
-      - name: Verify changes
+      - name: Verify the pull request
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        # A PR checkout is clean, so there are no uncommitted changes to inspect.
+        # --base makes the change under review the range base..HEAD.
         run: |
           crosscheck verify \
+            --base "origin/${{ github.event.pull_request.base.ref }}" \
             --intent "PR: ${{ github.event.pull_request.title }}"
         # Exit codes:
         #   0 — pass / advisory mode (default)
