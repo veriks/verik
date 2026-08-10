@@ -86,6 +86,27 @@ describe('LiveRegion', () => {
     }
   });
 
+  it('counts embedded newlines as the extra rows they occupy', () => {
+    const writes: string[] = [];
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      writes.push(String(chunk));
+      return true;
+    });
+
+    try {
+      const region = new LiveRegion();
+      // Two array entries, but the first prints two rows — this is exactly the
+      // shape stepHeader produces, and counting entries made the whole block
+      // walk up the screen one line per keypress.
+      region.render(['\nheader', 'body']);
+      region.render(['redrawn']);
+
+      expect(writes[1]).toBe('\x1b[1A\x1b[2K'.repeat(3));
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('does not rewind when nothing has been drawn', () => {
     const writes: string[] = [];
     const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {

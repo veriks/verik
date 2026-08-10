@@ -34,8 +34,17 @@ export const subtle = paint(chalk.hex(palette.subtle));
 export const bold = paint(chalk.bold);
 export const underline = paint(chalk.underline);
 
-/** The mark: a check and a cross — the two things the tool decides between. */
-export const mark = (): string => `${pass('✓')}${block('✕')}`;
+/**
+ * The mark: a check and a cross — the two things the tool decides between.
+ *
+ * The space between them is load-bearing. Both glyphs are full-width in most
+ * monospace fonts, so set adjacent they visually collide into one smudge.
+ *
+ * MARK_RAW is the uncoloured form; anything aligning a column must measure with
+ * it, since the coloured version carries escape codes that have no width.
+ */
+export const MARK_RAW = '✓ ✕';
+export const mark = (): string => `${pass('✓')} ${block('✕')}`;
 
 export const wordmark = (): string => `${mark()}  ${bold('crosscheck')}`;
 
@@ -91,28 +100,20 @@ export function box(title: string, body: string, tint: (s: string) => string): s
 }
 
 /**
- * Three-row wordmark. Each glyph is 2–3 columns joined by a single space —
- * tight kerning makes adjacent letters merge and become unreadable.
+ * Wordmark banner — the brand moment on `crosscheck` with no arguments.
+ *
+ * Deliberately not ASCII art. A box-drawing letterform depends on the terminal
+ * font rendering ┌ ┬ ┴ ┘ at consistent widths with no gaps; in most default
+ * fonts, including Windows Terminal's, the strokes break apart and the word
+ * becomes unreadable. A typeset lockup carries the identity through colour and
+ * the mark instead, and renders identically everywhere.
  */
-const GLYPHS: Record<string, [string, string, string]> = {
-  c: ['┌─', '│ ', '└─'],
-  r: ['┬─┐', '├┬┘', '┴└─'],
-  o: ['┌─┐', '│ │', '└─┘'],
-  s: ['┌─┐', '└─┐', '└─┘'],
-  h: ['┬ ┬', '├─┤', '┴ ┴'],
-  e: ['┌─┐', '├┤ ', '└─┘'],
-  k: ['┬┌─', '├┴┐', '┴ ┴'],
-};
-
-/** Full wordmark banner — the brand moment on `crosscheck` with no arguments. */
 export function banner(): string {
-  const letters = [...'crosscheck'];
-  const rows = [0, 1, 2].map((r) => '  ' + letters.map((ch) => GLYPHS[ch]![r]).join(' '));
   return [
     '',
-    ...rows.map((r) => brand(r)),
+    `  ${mark()}   ${bold(brand('crosscheck'))}`,
+    `  ${' '.repeat(MARK_RAW.length)}   ${muted('independent verification for AI-generated code')}`,
     '',
-    `  ${mark()}  ${muted('independent verification for AI-generated code')}`,
   ].join('\n');
 }
 

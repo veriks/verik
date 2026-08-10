@@ -9,7 +9,7 @@ import {
   withRawMode,
   type Key,
 } from './keypress.js';
-import { bold, brand, frameWidth, muted, pass, subtle } from './theme.js';
+import { MARK_RAW, bold, brand, frameWidth, muted, pass, subtle } from './theme.js';
 
 /**
  * Interactive prompts for onboarding.
@@ -59,8 +59,11 @@ export async function select<T>(opts: SelectOptions<T>): Promise<T> {
       const label = selected ? brand(bold(c.label)) : c.label;
       const badge = c.badge ? ` ${pass(c.badge)}` : '';
       lines.push(`  ${marker} ${label}${badge}`);
-      if (c.hint) lines.push(`    ${subtle(c.hint)}`);
     });
+    // Only the selected item's hint is shown. Showing all of them at once turns
+    // the list into a wall of grey text, and the single line reserved here keeps
+    // the block a constant height so it never jumps as you move.
+    lines.push('', `    ${subtle(choices[index]!.hint ?? '')}`);
     lines.push('', subtle(opts.footer ?? CANCEL_HINT));
     region.render(lines);
   };
@@ -122,7 +125,7 @@ export async function ask(question: string, fallback = '', hint?: string): Promi
 /** Step indicator, right-aligned against the frame. */
 export function stepHeader(mark: string, step: number, total: number): string[] {
   const left = `${mark}  ${bold('crosscheck')}`;
-  const rawLeft = '✓✕  crosscheck';
+  const rawLeft = `${MARK_RAW}  crosscheck`;
   const right = `step ${step} of ${total}`;
   const gap = Math.max(1, frameWidth() - rawLeft.length - right.length);
   return [`\n${left}${' '.repeat(gap)}${subtle(right)}`, subtle('─'.repeat(frameWidth())), ''];
