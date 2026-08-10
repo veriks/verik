@@ -175,9 +175,15 @@ export async function runVerificationPipeline(context: RunContext): Promise<Pipe
     }
   }
 
-  if (judge) {
-    policy = evaluatePolicy(judge, context.policy);
-  }
+  // Always evaluated, not only when a Judge exists. Rules mode has no Judge by
+  // design, and a Judge that failed still leaves rule findings that may be
+  // blocking — in both cases "no verdict" previously meant "no policy", so
+  // nothing could stop a critical finding from shipping.
+  policy = evaluatePolicy({
+    judge,
+    deterministicFindings: deterministic.findings,
+    policy: context.policy,
+  });
 
   return {
     scout,

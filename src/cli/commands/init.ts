@@ -83,7 +83,13 @@ export function buildInitCommand(): Command {
           JSON.stringify(DEFAULT_POLICY, null, 2),
           'utf8',
         );
-        await writeFile(join(ccDir, '.gitignore'), 'runs/\ncache/\n', 'utf8');
+        // objects/ and checkpoint.json are local baseline state — meaningless
+        // in someone else's clone and noisy in a diff.
+        await writeFile(
+          join(ccDir, '.gitignore'),
+          'runs/\ncache/\nobjects/\ncheckpoint.json\n',
+          'utf8',
+        );
 
         // Create a stable repo fingerprint immediately so memory is scoped
         // correctly from the very first run, not only after the first LLM call.

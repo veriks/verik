@@ -48,14 +48,15 @@ export function resolveExit(inputs: ExitInputs): ExitDecision {
   const commandFailed = commandExitCode !== null && commandExitCode !== 0;
   const reachedVerdict = verificationReachedVerdict(inputs);
 
-  // `rules` mode has no Judge and no policy by design, so there is no verdict
-  // to wait for and its absence is not a failure. It still must not mask a
-  // failing wrapped command.
+  // `rules` mode has no Judge by design, so the absence of a verdict is not a
+  // failure — but it does have a policy decision now, and a blocking rule
+  // finding must be able to stop the run. It still must not mask a failing
+  // wrapped command.
   if (inputs.mode === 'rules') {
-    return {
-      exitCode: commandFailed ? commandExitCode : 0,
-      status: 'completed',
-    };
+    if (policy && policy.exitCode !== 0) {
+      return { exitCode: policy.exitCode, status: 'completed' };
+    }
+    return { exitCode: commandFailed ? commandExitCode : 0, status: 'completed' };
   }
 
   // Shadow mode's entire contract is that it never changes the exit code. It

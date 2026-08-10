@@ -122,11 +122,19 @@ export async function computeWorktreeDiff(opts: {
    * range `baseRef..HEAD`.
    */
   baseRef?: string;
+  /**
+   * An explicit baseline tree, from `crosscheck begin`. Takes precedence over
+   * both `baseRef` and HEAD — it is the only baseline that can separate an
+   * unwrappable agent's work from the developer's own.
+   */
+  baseTree?: string;
+  /** Object stores holding `baseTree`, registered as git alternates. */
+  extraAlternates?: string[];
 }): Promise<{ snapshot: RepositorySnapshot; diff: DiffResult }> {
   const { createTreeWorkspace, readRefTree } = await import('./worktree-tree.js');
   const { captureSnapshot } = await import('./repository-snapshot.js');
 
-  const workspace = await createTreeWorkspace(opts.root);
+  const workspace = await createTreeWorkspace(opts.root, opts.extraAlternates ?? []);
   try {
     const snapshot = await captureSnapshot(
       opts.root,
@@ -134,9 +142,9 @@ export async function computeWorktreeDiff(opts: {
       'worktree',
       opts.includeUntracked ?? true,
     );
-    const baseTree = opts.baseRef
-      ? await readRefTree(opts.root, workspace, opts.baseRef)
-      : snapshot.headTree;
+    const baseTree =
+      opts.baseTree ??
+      (opts.baseRef ? await readRefTree(opts.root, workspace, opts.baseRef) : snapshot.headTree);
     const diff = await computeDiff({
       root: opts.root,
       workspace,
