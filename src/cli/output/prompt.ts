@@ -122,6 +122,26 @@ export async function ask(question: string, fallback = '', hint?: string): Promi
   }
 }
 
+/**
+ * Prints lines one at a time so a result set arrives rather than appearing all
+ * at once.
+ *
+ * This is presentation pacing, not a fake progress bar: every line printed is a
+ * result that already exists by the time reveal is called. It is skipped
+ * entirely when stdout is not a TTY, so CI logs and piped output get the same
+ * text instantly with no artificial delay in the build.
+ */
+export async function reveal(lines: string[], delayMs = 45): Promise<void> {
+  if (!isInteractive()) {
+    for (const line of lines) console.log(line);
+    return;
+  }
+  for (const line of lines) {
+    console.log(line);
+    await new Promise((r) => setTimeout(r, delayMs));
+  }
+}
+
 export type CheckState = 'ok' | 'none' | 'warn';
 
 export interface CheckItem {

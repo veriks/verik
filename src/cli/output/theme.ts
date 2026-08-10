@@ -130,6 +130,39 @@ export function kv(label: string, value: string, width = 12): string {
   return `  ${muted(label.padEnd(width))}${value}`;
 }
 
+/**
+ * A titled card of label/value rows.
+ *
+ * `box()` wraps one blob of prose; this is for structured settings, where the
+ * values should line up in a column so the card can be read down rather than
+ * across. Padding is computed on the raw strings — the coloured versions carry
+ * escape codes with no display width.
+ */
+export function card(
+  title: string,
+  rows: Array<[label: string, value: string]>,
+  tint: (s: string) => string = brand,
+  labelWidth = 12,
+): string[] {
+  const w = frameWidth();
+  const head = `─ ${title} `;
+  const out = [tint(`╭${head}${'─'.repeat(Math.max(0, w - 2 - head.length))}╮`)];
+
+  for (const [label, value] of rows) {
+    const raw = `  ${label.padEnd(labelWidth)}${stripAnsi(value)}`;
+    const painted = `  ${muted(label.padEnd(labelWidth))}${value}`;
+    out.push(`${tint('│')}${painted}${' '.repeat(Math.max(0, w - 2 - raw.length))}${tint('│')}`);
+  }
+
+  out.push(tint(`╰${'─'.repeat(w - 2)}╯`));
+  return out;
+}
+
+/** Measures display width by removing SGR escape sequences first. */
+export function stripAnsi(s: string): string {
+  return s.replace(/\[[0-9;]*m/g, '');
+}
+
 /** Full-width rule, optionally labelled. */
 export function rule(label?: string): string {
   const w = frameWidth();
