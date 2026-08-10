@@ -1,3 +1,5 @@
+import { block } from '../output/theme.js';
+import { formatError } from '../../shared/format-error.js';
 import { Command } from 'commander';
 import { getRepositoryInfo } from '../../core/repository/git-repository.js';
 import { loadConfig } from '../../config/config-loader.js';
@@ -62,7 +64,7 @@ export function buildBeginCommand(): Command {
           `    ${brand('crosscheck begin --clear')}${muted('   discard the baseline')}\n`,
         );
       } catch (err) {
-        console.error('Error:', String(err));
+        console.error(`${block('✕')} ${formatError(err)}`);
         process.exit(1);
       }
     });

@@ -1,4 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
+import { mkdir, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { simpleGit } from 'simple-git';
 import { createTestRepo, initWithCommit, type TestRepo } from '../helpers/test-repo.js';
 import { getRepositoryInfo } from '../../core/repository/git-repository.js';
@@ -239,9 +242,27 @@ describe('getRepositoryInfo', () => {
     expect(info.commitSha).toHaveLength(40);
   });
 
-  it('throws on non-git directory', async () => {
+  it('throws on a directory that is not a git repository', async () => {
+    // createTestRepo() runs `git init`, so it is NOT a non-git directory — the
+    // old version of this test was mislabelled and actually asserted the unborn
+    // -HEAD throw that has since been removed. Use a genuinely bare directory.
+    const bare = join(tmpdir(), `crosscheck-notgit-${Date.now()}`);
+    await mkdir(bare, { recursive: true });
+    try {
+      await expect(getRepositoryInfo(bare)).rejects.toThrow(/not a git repository/i);
+    } finally {
+      await rm(bare, { recursive: true, force: true });
+    }
+  });
+
+  it('treats an unborn HEAD as a supported state, not an error', async () => {
+    // `git init` then `crosscheck init` is the first thing a new user does.
+    // Every file reads as added against an empty baseline, which is correct for
+    // a repository whose first commit has not happened yet.
     repo = await createTestRepo();
-    await expect(getRepositoryInfo(repo.root)).rejects.toThrow();
+    const info = await getRepositoryInfo(repo.root);
+    expect(info.isBorn).toBe(false);
+    expect(info.commitSha).toBe('');
   });
 
   it('reports isDirty correctly', async () => {
