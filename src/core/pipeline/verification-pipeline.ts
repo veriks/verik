@@ -47,20 +47,33 @@ export async function runVerificationPipeline(context: RunContext): Promise<Pipe
   let judge: JudgeOutput | undefined;
   let policy: PolicyResult | undefined;
 
+  // `rules` mode runs the deterministic rules and the Builder only. Both are
+  // plain code, so the whole pipeline is useful with no API key — skipping the
+  // inference stages deliberately is very different from letting them fail.
+  const rulesOnly = context.config.mode === 'rules';
+  if (rulesOnly) {
+    logger.debug('Rules-only mode: skipping Scout, Reviewer and Judge.');
+  }
+
   // Scout
-  stageStatuses.scout = 'running';
-  p.start('Scout', 'understanding scope and risk…');
-  const scoutResult = await runStage(new ScoutStage(), { context }, context);
-  stageMetadata.scout = scoutResult.metadata;
-  if (scoutResult.metadata.status === 'completed') {
-    scout = scoutResult.output;
-    stageStatuses.scout = 'completed';
-    p.succeed('Scout', scoutResult.metadata.durationMs, scout.riskLevel.toUpperCase() + ' risk');
+  if (rulesOnly) {
+    stageStatuses.scout = 'skipped';
+    p.skip('Scout', 'rules-only mode');
   } else {
-    stageStatuses.scout = 'failed';
-    errors.push(`Scout failed: ${scoutResult.metadata.error ?? 'unknown error'}`);
-    p.fail('Scout', scoutResult.metadata.durationMs, 'inconclusive');
-    logger.warn('Scout stage failed, continuing with partial results');
+    stageStatuses.scout = 'running';
+    p.start('Scout', 'understanding scope and risk…');
+    const scoutResult = await runStage(new ScoutStage(), { context }, context);
+    stageMetadata.scout = scoutResult.metadata;
+    if (scoutResult.metadata.status === 'completed') {
+      scout = scoutResult.output;
+      stageStatuses.scout = 'completed';
+      p.succeed('Scout', scoutResult.metadata.durationMs, scout.riskLevel.toUpperCase() + ' risk');
+    } else {
+      stageStatuses.scout = 'failed';
+      errors.push(`Scout failed: ${scoutResult.metadata.error ?? 'unknown error'}`);
+      p.fail('Scout', scoutResult.metadata.durationMs, 'inconclusive');
+      logger.warn('Scout stage failed, continuing with partial results');
+    }
   }
 
   // Builder
@@ -103,53 +116,63 @@ export async function runVerificationPipeline(context: RunContext): Promise<Pipe
   }
 
   // Reviewer
-  stageStatuses.reviewer = 'running';
-  p.start('Reviewer', 'analysing for correctness and security…');
-  const reviewerResult = await runStage(
-    new ReviewerStage(),
-    { context, scout, builder, deterministic },
-    context,
-  );
-  stageMetadata.reviewer = reviewerResult.metadata;
-  if (reviewerResult.metadata.status === 'completed') {
-    reviewer = reviewerResult.output;
-    stageStatuses.reviewer = 'completed';
-    const n = reviewer.findings.length;
-    const high = reviewer.findings.filter(
-      (f) => f.severity === 'high' || f.severity === 'critical',
-    ).length;
-    p.succeed(
-      'Reviewer',
-      reviewerResult.metadata.durationMs,
-      `${n} finding(s)${high ? `, ${high} high` : ''}`,
-    );
+  if (rulesOnly) {
+    stageStatuses.reviewer = 'skipped';
+    p.skip('Reviewer', 'rules-only mode');
   } else {
-    stageStatuses.reviewer = 'failed';
-    errors.push(`Reviewer failed: ${reviewerResult.metadata.error ?? 'unknown error'}`);
-    p.fail('Reviewer', reviewerResult.metadata.durationMs);
+    stageStatuses.reviewer = 'running';
+    p.start('Reviewer', 'analysing for correctness and security…');
+    const reviewerResult = await runStage(
+      new ReviewerStage(),
+      { context, scout, builder, deterministic },
+      context,
+    );
+    stageMetadata.reviewer = reviewerResult.metadata;
+    if (reviewerResult.metadata.status === 'completed') {
+      reviewer = reviewerResult.output;
+      stageStatuses.reviewer = 'completed';
+      const n = reviewer.findings.length;
+      const high = reviewer.findings.filter(
+        (f) => f.severity === 'high' || f.severity === 'critical',
+      ).length;
+      p.succeed(
+        'Reviewer',
+        reviewerResult.metadata.durationMs,
+        `${n} finding(s)${high ? `, ${high} high` : ''}`,
+      );
+    } else {
+      stageStatuses.reviewer = 'failed';
+      errors.push(`Reviewer failed: ${reviewerResult.metadata.error ?? 'unknown error'}`);
+      p.fail('Reviewer', reviewerResult.metadata.durationMs);
+    }
   }
 
   // Judge
-  stageStatuses.judge = 'running';
-  p.start('Judge', 'weighing evidence…');
-  const judgeResult = await runStage(
-    new JudgeStage(),
-    { context, scout, builder, reviewer, deterministicFindings: deterministic.findings },
-    context,
-  );
-  stageMetadata.judge = judgeResult.metadata;
-  if (judgeResult.metadata.status === 'completed') {
-    judge = judgeResult.output;
-    stageStatuses.judge = judge.verdict === 'inconclusive' ? 'inconclusive' : 'completed';
-    p.succeed(
-      'Judge',
-      judgeResult.metadata.durationMs,
-      `${judge.verdict.toUpperCase()} · ${Math.round(judge.confidence * 100)}% confidence`,
-    );
+  if (rulesOnly) {
+    stageStatuses.judge = 'skipped';
+    p.skip('Judge', 'rules-only mode');
   } else {
-    stageStatuses.judge = 'failed';
-    errors.push(`Judge failed: ${judgeResult.metadata.error ?? 'unknown error'}`);
-    p.fail('Judge', judgeResult.metadata.durationMs);
+    stageStatuses.judge = 'running';
+    p.start('Judge', 'weighing evidence…');
+    const judgeResult = await runStage(
+      new JudgeStage(),
+      { context, scout, builder, reviewer, deterministicFindings: deterministic.findings },
+      context,
+    );
+    stageMetadata.judge = judgeResult.metadata;
+    if (judgeResult.metadata.status === 'completed') {
+      judge = judgeResult.output;
+      stageStatuses.judge = judge.verdict === 'inconclusive' ? 'inconclusive' : 'completed';
+      p.succeed(
+        'Judge',
+        judgeResult.metadata.durationMs,
+        `${judge.verdict.toUpperCase()} · ${Math.round(judge.confidence * 100)}% confidence`,
+      );
+    } else {
+      stageStatuses.judge = 'failed';
+      errors.push(`Judge failed: ${judgeResult.metadata.error ?? 'unknown error'}`);
+      p.fail('Judge', judgeResult.metadata.durationMs);
+    }
   }
 
   if (judge) {

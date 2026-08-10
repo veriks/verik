@@ -31,6 +31,11 @@ export interface ExitInputs {
   stageStatuses: Partial<Record<string, StageRunStatus>>;
   /** `shadow` promises to never affect the exit code. */
   policyMode: 'shadow' | 'advisory' | 'blocking';
+  /**
+   * `rules` runs only the deterministic rules and the Builder. It has no Judge
+   * by design, so the absence of a verdict is success, not a failed run.
+   */
+  mode?: 'rules' | 'full';
 }
 
 /** A verdict requires the Judge to have actually produced one. */
@@ -42,6 +47,16 @@ export function resolveExit(inputs: ExitInputs): ExitDecision {
   const { commandExitCode, policy, policyMode } = inputs;
   const commandFailed = commandExitCode !== null && commandExitCode !== 0;
   const reachedVerdict = verificationReachedVerdict(inputs);
+
+  // `rules` mode has no Judge and no policy by design, so there is no verdict
+  // to wait for and its absence is not a failure. It still must not mask a
+  // failing wrapped command.
+  if (inputs.mode === 'rules') {
+    return {
+      exitCode: commandFailed ? commandExitCode : 0,
+      status: 'completed',
+    };
+  }
 
   // Shadow mode's entire contract is that it never changes the exit code. It
   // still must not mask a failing wrapped command.

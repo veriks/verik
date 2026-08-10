@@ -78,4 +78,23 @@ describe('resolveExit', () => {
     const r = resolveExit({ ...base, stageStatuses: { judge: 'failed' } });
     expect(r.status).toBe('inconclusive');
   });
+
+  describe('rules mode', () => {
+    // No Judge and no policy by design, so the absence of a verdict is success.
+    const rules = { ...base, mode: 'rules' as const, policy: undefined, stageStatuses: {} };
+
+    it('completes without a verdict rather than reporting inconclusive', () => {
+      expect(resolveExit(rules)).toMatchObject({ exitCode: 0, status: 'completed' });
+    });
+
+    it('does not dereference the absent policy', () => {
+      // Regression: an earlier version treated rules mode as "reached a
+      // verdict" and then read policy!.exitCode, throwing on every run.
+      expect(() => resolveExit(rules)).not.toThrow();
+    });
+
+    it('still surfaces a failing wrapped command', () => {
+      expect(resolveExit({ ...rules, commandExitCode: 1 }).exitCode).toBe(1);
+    });
+  });
 });

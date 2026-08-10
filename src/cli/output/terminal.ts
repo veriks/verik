@@ -117,11 +117,11 @@ function printFindings(findings: Finding[], limit = 5): void {
     const tint = severityTint(f.severity);
     // A colour bar carries severity at a glance; the label keeps it readable
     // without colour and for anyone who can't distinguish the hues.
-    console.log(`${tint('▊')} ${tint(f.severity.toUpperCase().padEnd(8))}${f.title}`);
+    console.log(`${tint('▊')} ${tint(f.severity.toUpperCase().padEnd(9))}${f.title}`);
     const ev = f.evidence[0];
     if (ev) {
       const loc = ev.startLine ? `:${ev.startLine}` : '';
-      console.log(`${tint('▊')} ${' '.repeat(8)}${subtle(ev.path + loc)}`);
+      console.log(`${tint('▊')} ${' '.repeat(9)}${subtle(ev.path + loc)}`);
     }
   }
   if (ranked.length > limit) {
@@ -156,9 +156,9 @@ export function printVerdictSummary(
     console.log(muted('RULES'));
     for (const f of pipeline.deterministicFindings) {
       const tint = severityTint(f.severity);
-      console.log(`${tint('▊')} ${tint(f.severity.toUpperCase().padEnd(8))}${f.title}`);
+      console.log(`${tint('▊')} ${tint(f.severity.toUpperCase().padEnd(9))}${f.title}`);
       console.log(
-        `${tint('▊')} ${' '.repeat(8)}${subtle(f.file + (f.line ? `:${f.line}` : ''))} ${subtle(`· ${f.ruleId}`)}`,
+        `${tint('▊')} ${' '.repeat(9)}${subtle(f.file + (f.line ? `:${f.line}` : ''))} ${subtle(`· ${f.ruleId}`)}`,
       );
     }
     console.log();

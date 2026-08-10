@@ -192,6 +192,7 @@ export async function orchestrateRun(
       policy: pipelineResult.policy,
       stageStatuses: pipelineResult.stageStatuses,
       policyMode: policy.mode,
+      mode: config.mode,
     });
 
     const finalRecord = {
