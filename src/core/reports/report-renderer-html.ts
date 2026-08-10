@@ -2,6 +2,7 @@ import type { RunContext } from '../run/run-context.js';
 import type { PipelineResult } from '../pipeline/verification-pipeline.js';
 import type { Finding } from '../../stages/reviewer/reviewer-schema.js';
 import type { BuilderCommandResult } from '../../stages/builder/builder-schema.js';
+import { redactCommandLine } from '../../shared/redaction.js';
 
 const STATUS = {
   block: { color: '#ff4444', label: 'Block' },
@@ -234,7 +235,9 @@ export function renderHtmlReport(context: RunContext, pipeline: PipelineResult):
 </details>`
     : '';
 
-  const diffSec = diff?.patch
+  // An HTML report is the most shareable artifact Crosscheck produces, so it
+  // renders the sanitised patch.
+  const diffSec = diff?.safePatch
     ? `
 <details class="acc">
   <summary>
@@ -242,7 +245,7 @@ export function renderHtmlReport(context: RunContext, pipeline: PipelineResult):
     <span class="acc-dur" style="margin-left:0">+${diff.additions} -${diff.deletions} · ${diff.changedFiles.length} files</span>
     ${accArrow}
   </summary>
-  ${renderDiff(diff.patch)}
+  ${renderDiff(diff.safePatch)}
 </details>`
     : '';
 
@@ -276,7 +279,7 @@ export function renderHtmlReport(context: RunContext, pipeline: PipelineResult):
   </div>
   ${judge ? `<p class="status-summary">${e(judge.summary)}</p>` : ''}
   <div class="status-chips">
-    ${chip('command', record.wrappedCommand.join(' '))}
+    ${chip('command', redactCommandLine(record.wrappedCommand))}
     ${chip('branch', record.branch)}
     ${chip('commit', record.baselineCommitSha.slice(0, 8))}
     ${judge ? chip('confidence', pct(judge.confidence) + '%') : ''}

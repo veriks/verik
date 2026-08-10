@@ -1,76 +1,65 @@
-import { readFile, stat } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { relative } from 'node:path';
 import { simpleGit } from 'simple-git';
-import { sha256 } from '../../shared/hashing.js';
-import { logger } from '../../shared/logger.js';
+import { buildWorktreeTree, readHeadTree, type TreeWorkspace } from './worktree-tree.js';
 
-export interface FileEntry {
-  path: string;
-  hash: string;
-  size: number;
-}
-
+/**
+ * A snapshot is now two tree oids rather than a bag of diffs and file hashes.
+ *
+ * The previous shape hashed each changed file individually and carried the full
+ * staged and unstaged diffs as strings. That had three problems: files above
+ * `maxFileBytes` were silently skipped, so a large pre-existing edit vanished
+ * from the baseline and got attributed to the wrapped command; the
+ * staged/unstaged split is an index artifact rather than a state distinction;
+ * and the diff strings were persisted verbatim into `metadata.json`, putting
+ * unredacted secrets on disk.
+ *
+ * A tree oid is a complete, content-addressed description of the worktree with
+ * none of those properties.
+ */
 export interface RepositorySnapshot {
   capturedAt: string;
   commitSha: string;
   branch: string;
-  stagedDiff: string;
-  unstagedDiff: string;
-  untrackedFiles: string[];
-  trackedChangedFiles: FileEntry[];
+  /** Tree oid of the whole worktree — tracked, staged and untracked alike. */
+  tree: string;
+  /** Tree oid of HEAD at capture time. */
+  headTree: string;
+  /** Whether the worktree differed from HEAD when captured. */
+  dirty: boolean;
+  /** Content-addressed run fingerprint. The tree oid already is one. */
   hash: string;
 }
 
+/**
+ * `label` must be unique per capture within a workspace — the baseline and
+ * final captures each need their own temp index file.
+ *
+ * `includeUntracked` must be identical across the two captures of a run, or the
+ * asymmetry fabricates additions and deletions.
+ */
 export async function captureSnapshot(
   root: string,
-  maxFileBytes: number,
+  ws: TreeWorkspace,
+  label: string,
+  includeUntracked = true,
 ): Promise<RepositorySnapshot> {
   const git = simpleGit(root);
   const status = await git.status();
   const commitSha = (await git.revparse(['HEAD'])).trim();
-  const branch = status.current ?? 'HEAD';
-  const stagedDiff = await git.diff(['--cached']);
-  const unstagedDiff = await git.diff();
 
-  const changedPaths = [
-    ...status.modified,
-    ...status.created,
-    ...status.deleted,
-    ...status.renamed.map((r) => r.to),
-    ...status.staged,
-  ];
-  const uniquePaths = [...new Set(changedPaths)];
-
-  const trackedChangedFiles: FileEntry[] = [];
-  for (const p of uniquePaths) {
-    const fullPath = join(root, p);
-    try {
-      const info = await stat(fullPath);
-      if (info.size > maxFileBytes) {
-        logger.debug(`Skipping large file in snapshot: ${p} (${info.size} bytes)`);
-        continue;
-      }
-      const content = await readFile(fullPath);
-      trackedChangedFiles.push({ path: p, hash: sha256(content), size: info.size });
-    } catch {
-      // deleted file
-      trackedChangedFiles.push({ path: p, hash: 'deleted', size: 0 });
-    }
-  }
-
-  const fingerprint = sha256(
-    JSON.stringify({ commitSha, stagedDiff, unstagedDiff, trackedChangedFiles }),
-  );
+  const [tree, headTree] = await Promise.all([
+    buildWorktreeTree(root, ws, label, includeUntracked),
+    readHeadTree(root, ws),
+  ]);
 
   return {
     capturedAt: new Date().toISOString(),
     commitSha,
-    branch,
-    stagedDiff,
-    unstagedDiff,
-    untrackedFiles: status.not_added,
-    trackedChangedFiles,
-    hash: fingerprint,
+    branch: status.current ?? 'HEAD',
+    tree,
+    headTree,
+    dirty: tree !== headTree,
+    hash: tree,
   };
 }
 

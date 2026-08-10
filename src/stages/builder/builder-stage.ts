@@ -28,13 +28,22 @@ export interface BuilderInput {
 export class BuilderStage implements VerificationStage<BuilderInput, BuilderOutput> {
   name = 'Builder';
 
-  async execute(input: BuilderInput, _context: RunContext): Promise<StageOutputWithMeta<BuilderOutput>> {
+  async execute(
+    input: BuilderInput,
+    _context: RunContext,
+  ): Promise<StageOutputWithMeta<BuilderOutput>> {
     const { context } = input;
     const { repoRoot, config, repoId } = context;
 
     if (!config.builder.enabled) {
       return {
-        output: { projectTypes: [], commands: [], overallStatus: 'skipped', evidence: [], limitations: ['Builder disabled in config'] },
+        output: {
+          projectTypes: [],
+          commands: [],
+          overallStatus: 'skipped',
+          evidence: [],
+          limitations: ['Builder disabled in config'],
+        },
         meta: { fromCache: false },
       };
     }
@@ -59,7 +68,11 @@ export class BuilderStage implements VerificationStage<BuilderInput, BuilderOutp
 
     // Check verification cache
     const diffHash = sha256(context.diff?.patch ?? '');
-    const cacheKey = VerificationCache.builderKey(repoId, diffHash, planned.map((p) => p.command));
+    const cacheKey = VerificationCache.builderKey(
+      repoId,
+      diffHash,
+      planned.map((p) => p.command),
+    );
     const cached = await context.cache.get<BuilderOutput>(cacheKey, repoId);
     if (cached) {
       return { output: cached, meta: { fromCache: true } };
@@ -72,6 +85,9 @@ export class BuilderStage implements VerificationStage<BuilderInput, BuilderOutp
       commandResults.push(result);
     }
 
+    // 'unavailable' is deliberately excluded: a tool that never ran is an
+    // absence of evidence, not evidence of a defect. Surfacing it here would
+    // let the Judge read a missing package manager as a broken build.
     const evidence: BuilderEvidence[] = commandResults
       .filter((r) => r.status === 'failed' || r.status === 'timed_out' || r.status === 'errored')
       .map((r, i) => ({
@@ -81,14 +97,31 @@ export class BuilderStage implements VerificationStage<BuilderInput, BuilderOutp
         reference: `builder-command-${i}`,
       }));
 
-    const anyFailed = commandResults.some((r) => r.status === 'failed' || r.status === 'timed_out');
-    const anyErrored = commandResults.some((r) => r.status === 'errored');
-    const allPassed = commandResults.every((r) => r.status === 'passed');
+    const unavailable = commandResults.filter((r) => r.status === 'unavailable');
+    const ran = commandResults.filter((r) => r.status !== 'unavailable');
 
-    const overallStatus = anyFailed ? 'failed'
-      : anyErrored ? 'errored'
-      : allPassed ? 'passed'
-      : 'skipped';
+    const anyFailed = ran.some((r) => r.status === 'failed' || r.status === 'timed_out');
+    const anyErrored = ran.some((r) => r.status === 'errored');
+    const allPassed = ran.length > 0 && ran.every((r) => r.status === 'passed');
+
+    const overallStatus = anyFailed
+      ? 'failed'
+      : anyErrored
+        ? 'errored'
+        : allPassed
+          ? 'passed'
+          : unavailable.length
+            ? 'unavailable'
+            : 'skipped';
+
+    const limitations: string[] = [];
+    if (unavailable.length) {
+      const missing = [...new Set(unavailable.map((r) => r.command.split(' ')[0]))];
+      limitations.push(
+        `${unavailable.length} check(s) could not run — ${missing.join(', ')} not found on PATH. ` +
+          `This is a missing tool, not a failing build: treat these checks as unverified rather than broken.`,
+      );
+    }
 
     const output: BuilderOutput = {
       projectTypes: detection.projectTypes,
@@ -96,7 +129,7 @@ export class BuilderStage implements VerificationStage<BuilderInput, BuilderOutp
       commands: commandResults,
       overallStatus,
       evidence,
-      limitations: [],
+      limitations,
     };
 
     // Only cache passing or failed results — not errored/timed out

@@ -1,7 +1,6 @@
 import { Command } from 'commander';
 import { getRepositoryInfo } from '../../core/repository/git-repository.js';
-import { captureSnapshot } from '../../core/repository/repository-snapshot.js';
-import { computeDiff } from '../../core/repository/diff-capture.js';
+import { computeWorktreeDiff } from '../../core/repository/diff-capture.js';
 import { loadConfig, loadPolicy } from '../../config/config-loader.js';
 import { generateRunId } from '../../core/run/run-orchestrator.js';
 import { createRunRecord } from '../../core/run/run-state.js';
@@ -33,8 +32,12 @@ export function buildVerifyCommand(): Command {
         ]);
         const policy = await loadPolicy(root);
 
-        const snapshot = await captureSnapshot(root, config.verification.maxFileBytes);
-        const diff = await computeDiff(root, { ...snapshot, trackedChangedFiles: [], untrackedFiles: [] }, config.verification.maxDiffBytes, config.verification.includeUntrackedFiles);
+        const { snapshot, diff } = await computeWorktreeDiff({
+          root,
+          maxDiffBytes: config.verification.maxDiffBytes,
+          excludePatterns: config.privacy.excludePatterns,
+          includeUntracked: config.verification.includeUntrackedFiles,
+        });
 
         if (diff.changedFiles.length === 0) {
           console.log('No changes to verify.');

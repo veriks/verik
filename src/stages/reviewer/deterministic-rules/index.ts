@@ -1,4 +1,5 @@
 import type { DiffResult } from '../../../core/repository/diff-capture.js';
+import type { RawPatch } from '../../../core/privacy/patch-types.js';
 import type { Severity } from '../../../shared/schemas.js';
 
 export interface DeterministicFinding {
@@ -15,7 +16,13 @@ export interface DeterministicFinding {
 
 export interface RuleContext {
   diff: DiffResult;
-  patch: string;
+  /**
+   * Deliberately the *unredacted* patch. These rules run locally and never call
+   * out, and SecretLeakRule cannot detect a secret that has already been
+   * replaced with `[REDACTED]` — feeding it the sanitised patch would silently
+   * disable the very rule most worth having.
+   */
+  patch: RawPatch;
 }
 
 export interface DeterministicRule {
