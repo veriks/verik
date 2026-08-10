@@ -5,9 +5,16 @@ import { getRepositoryInfo } from '../../core/repository/git-repository.js';
 import { CrosscheckError } from '../../shared/errors.js';
 import { DEFAULT_CONFIG, DEFAULT_POLICY, DEFAULT_MODELS } from '../../config/defaults.js';
 import { getOrCreateFingerprint } from '../../core/repository/repo-fingerprint.js';
-import { PROVIDERS, resolveApiKey, type ProviderId } from '../../inference/providers.js';
+import {
+  PROVIDERS,
+  PROVIDER_IDS,
+  resolveApiKey,
+  type ProviderId,
+} from '../../inference/providers.js';
 import { PromptCancelled } from '../output/keypress.js';
-import { ask, isInteractive, select, stepHeader } from '../output/prompt.js';
+import { ask, checklist, isInteractive, select, stepHeader } from '../output/prompt.js';
+import { detectProject } from '../../stages/builder/project-detector.js';
+import { planCommands } from '../../stages/builder/command-planner.js';
 import { banner, box, brand, mark, muted, pass, subtle, warn } from '../output/theme.js';
 
 type Mode = 'rules' | 'full';
@@ -52,6 +59,10 @@ export function buildInitCommand(): Command {
         const interactive = isInteractive() && !options.yes;
 
         if (interactive) console.log(banner());
+        // Printed even under --yes: what was detected is information, and a CI
+        // log showing "no build commands found" explains a later empty Builder
+        // stage far better than silence does.
+        printDetected(info.root, info.branch, info.isDirty);
 
         const setup = await collectSetup(options, interactive);
 
@@ -76,7 +87,16 @@ export function buildInitCommand(): Command {
 
         // Create a stable repo fingerprint immediately so memory is scoped
         // correctly from the very first run, not only after the first LLM call.
-        await getOrCreateFingerprint(info.root, info.remote);
+        const fingerprint = await getOrCreateFingerprint(info.root, info.remote);
+
+        console.log();
+        for (const line of checklist([
+          { label: 'config', detail: '.crosscheck/config.json' },
+          { label: 'policy', detail: `.crosscheck/policy.json · ${DEFAULT_POLICY.mode}` },
+          { label: 'repo id', detail: fingerprint.repoId },
+        ])) {
+          console.log(line);
+        }
 
         printSummary(setup);
       } catch (err) {
@@ -92,6 +112,54 @@ export function buildInitCommand(): Command {
         process.exit(1);
       }
     });
+}
+
+/**
+ * Reports what was actually determined about this repository.
+ *
+ * This is the same detection the Builder performs at run time, so it doubles as
+ * a preview: the commands listed here are literally the ones a run would
+ * execute. That makes it worth reading rather than decoration — and if it says
+ * "no build commands found", that is a genuine finding the user should see now
+ * rather than discover on their first run.
+ */
+function printDetected(root: string, branch: string, dirty: boolean): void {
+  const project = detectProject(root);
+  const planned = planCommands(project, []);
+
+  const stack = [project.projectTypes.join(', '), project.packageManager]
+    .filter(Boolean)
+    .join(' · ');
+
+  const withKey = PROVIDER_IDS.map((id) => PROVIDERS[id]).find(
+    (spec) => !spec.keyOptional && resolveApiKey(spec),
+  );
+
+  console.log(
+    checklist([
+      {
+        label: 'repository',
+        detail: `${branch}${dirty ? subtle(' · uncommitted changes') : ''}`,
+      },
+      {
+        label: 'project',
+        detail: stack || 'generic',
+        state: project.projectTypes.includes('generic') ? 'none' : 'ok',
+      },
+      {
+        label: 'build commands',
+        detail: planned.length
+          ? planned.map((p) => p.command).join(' · ')
+          : 'none found — the Builder stage will be skipped',
+        state: planned.length ? 'ok' : 'none',
+      },
+      {
+        label: 'api key',
+        detail: withKey ? `${withKey.apiKeyEnv} detected` : 'none in environment',
+        state: withKey ? 'ok' : 'none',
+      },
+    ]).join('\n'),
+  );
 }
 
 async function collectSetup(

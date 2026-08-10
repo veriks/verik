@@ -9,7 +9,7 @@ import {
   withRawMode,
   type Key,
 } from './keypress.js';
-import { MARK_RAW, bold, brand, frameWidth, muted, pass, subtle } from './theme.js';
+import { MARK_RAW, bold, brand, frameWidth, muted, pass, subtle, warn } from './theme.js';
 
 /**
  * Interactive prompts for onboarding.
@@ -120,6 +120,31 @@ export async function ask(question: string, fallback = '', hint?: string): Promi
   } finally {
     rl.close();
   }
+}
+
+export type CheckState = 'ok' | 'none' | 'warn';
+
+export interface CheckItem {
+  label: string;
+  detail: string;
+  state?: CheckState;
+}
+
+/**
+ * A checklist of things actually determined about the repository.
+ *
+ * Every line here reports a real result — the project type that was detected,
+ * the commands the Builder would run, whether a key is present. Nothing is
+ * padded with invented steps or artificial delay: a progress list that narrates
+ * work nobody did is just a loading bar with extra words, and it would be the
+ * one part of a verification tool that lies to you.
+ */
+export function checklist(items: CheckItem[], width = 16): string[] {
+  return items.map(({ label, detail, state = 'ok' }) => {
+    const glyph = state === 'ok' ? pass('✓') : state === 'warn' ? warn('!') : subtle('–');
+    const value = state === 'none' ? subtle(detail) : detail;
+    return `  ${glyph} ${muted(label.padEnd(width))}${value}`;
+  });
 }
 
 /** Step indicator, right-aligned against the frame. */
