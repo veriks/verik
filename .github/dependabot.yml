@@ -2,22 +2,47 @@ version: 2
 
 # Crosscheck is installed globally and runs in CI with ANTHROPIC_API_KEY in the
 # environment, so a compromised transitive dependency is a direct path to a
-# user's source code and their key. Dependency freshness is a security control
-# here, not housekeeping.
+# user's source code and their key. Dependency freshness is a security control.
+#
+# But version updates and security updates are separate mechanisms, and only
+# *version* updates are configured here. Dependabot security alerts still open
+# PRs for vulnerable packages regardless of these rules — including majors, and
+# including packages ignored below. Quieting this file costs no security; it
+# removes the churn that was burying the alerts that matter.
 updates:
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
     groups:
-      # One PR for routine bumps; security advisories still arrive separately
-      # and immediately via Dependabot alerts.
-      dev-dependencies:
+      # One PR for routine bumps rather than one per package.
+      production:
+        dependency-type: production
+        update-types: [minor, patch]
+      development:
         dependency-type: development
         update-types: [minor, patch]
+    ignore:
+      # Majors are breaking changes by definition. A bot PR that fails CI is
+      # noise, not information — bump these deliberately, one at a time.
+      - dependency-name: '*'
+        update-types: [version-update:semver-major]
+      # @types/node must track the runtime declared in `engines` (>=20).
+      # Letting it drift to a newer major typechecks the code against APIs the
+      # supported runtime does not have.
+      - dependency-name: '@types/node'
+        versions: ['>=21']
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    open-pull-requests-limit: 1
+    groups:
+      # Actions move as a set; a PR per action is pure noise.
+      actions:
+        patterns: ['*']
+    ignore:
+      - dependency-name: '*'
+        update-types: [version-update:semver-major]
