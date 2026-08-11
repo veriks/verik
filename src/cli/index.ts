@@ -67,7 +67,14 @@ program.addCommand(buildConfigCommand());
 // checkpoint and every run record. Move it before any command resolves a path,
 // so an existing install keeps its baseline and history instead of silently
 // starting over.
-await migrateIfNeeded(process.cwd());
+//
+// A preAction hook rather than a top-level await: esbuild cannot emit
+// top-level await for the CJS target, and that target is what the standalone
+// binaries are built from. The ESM bundle compiled fine, so this only broke
+// `build:bin`.
+program.hook('preAction', async () => {
+  await migrateIfNeeded(process.cwd());
+});
 
 program.parseAsync(process.argv).catch((err) => {
   console.error(`${block('✕')} ${formatError(err)}`);
