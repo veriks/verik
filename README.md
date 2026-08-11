@@ -3,6 +3,9 @@
 **Verification for AI-generated code.**
 Mark a line. Let the agent work. See exactly what it changed.
 
+<img width="381" height="141" alt="image" src="https://github.com/user-attachments/assets/13897a61-79b9-4635-81fc-5f3e34307226" />
+
+
 [Quickstart](docs/quickstart.md) · [Reference](docs/reference.md) · [CI](docs/ci.md)
 
 ## What is Verik?
