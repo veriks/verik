@@ -56,7 +56,9 @@ export function buildRunCommand(): Command {
           printVerdictSummary(result.pipeline, result, flags.intent);
         }
 
-        process.exit(result.exitCode);
+        // Same reason as verify: forcing exit while an HTTP handle is closing
+        // aborts the process on Windows and replaces the exit code with 127.
+        process.exitCode = result.exitCode;
       } catch (err) {
         if (err instanceof VerikError) {
           if (!flags.quiet) printError(err.message);

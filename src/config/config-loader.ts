@@ -92,5 +92,10 @@ function applyEnvironmentOverrides(config: VerikConfig): VerikConfig {
   const scout = process.env['VERIK_MODEL_SCOUT'] ?? config.models.scout;
   const reviewer = process.env['VERIK_MODEL_REVIEWER'] ?? config.models.reviewer;
   const judge = process.env['VERIK_MODEL_JUDGE'] ?? config.models.judge;
-  return { ...config, models: { scout, reviewer, judge } };
+  // The endpoint is the setting most likely to differ between machines — a
+  // gateway at work, a local runtime at home, a mock in CI — and it was the
+  // only one of the four with no override, so changing it meant editing a
+  // committed file.
+  const baseUrl = process.env['VERIK_BASE_URL'] ?? config.baseUrl;
+  return { ...config, models: { scout, reviewer, judge }, ...(baseUrl ? { baseUrl } : {}) };
 }

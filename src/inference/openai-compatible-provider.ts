@@ -189,7 +189,16 @@ export class OpenAICompatibleProvider implements LlmProvider {
       body['response_format'] = { type: 'json_object' };
     }
 
-    const headers: Record<string, string> = { 'content-type': 'application/json' };
+    // Node's fetch keeps sockets alive by default. The CLI calls process.exit
+    // as soon as a verdict is in, and on Windows tearing down a live keep-alive
+    // handle mid-close trips a libuv assertion:
+    //   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), src\winsync.c
+    // A CLI makes three requests and leaves, so there is nothing to reuse the
+    // connection for.
+    const headers: Record<string, string> = {
+      'content-type': 'application/json',
+      connection: 'close',
+    };
     if (this.apiKey) headers['authorization'] = `Bearer ${this.apiKey}`;
 
     const res = await fetch(`${this.baseUrl.replace(/\/$/, '')}/chat/completions`, {

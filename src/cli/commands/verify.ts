@@ -1,5 +1,6 @@
 import { block } from '../output/theme.js';
 import { formatError } from '../../shared/format-error.js';
+import { setVerbose } from '../../shared/logger.js';
 import { Command } from 'commander';
 import { getRepositoryInfo } from '../../core/repository/git-repository.js';
 import { computeWorktreeDiff } from '../../core/repository/diff-capture.js';
@@ -25,6 +26,7 @@ export function buildVerifyCommand(): Command {
     .description('Verify current uncommitted diff without running a command')
     .option('--json', 'Output JSON')
     .option('--quiet', 'Suppress output')
+    .option('--verbose', 'Log stage errors and provider requests')
     .option('--intent <text>', 'User intent')
     .option(
       '--base <ref>',
@@ -44,6 +46,9 @@ export function buildVerifyCommand(): Command {
           getOrCreateFingerprint(root, info.remote),
         ]);
         const policy = await loadPolicy(root);
+        // Without this a failed stage prints one line and the reason is only
+        // recoverable by reading report.json out of the run directory.
+        if (options['verbose']) setVerbose(true);
 
         // The git hook forces `rules` this way: full mode calls the API on every
         // commit, which is neither fast enough nor cheap enough to sit in front
@@ -116,7 +121,7 @@ export function buildVerifyCommand(): Command {
         const flags: RunFlags = {
           json: Boolean(options['json']),
           quiet: Boolean(options['quiet']),
-          verbose: false,
+          verbose: Boolean(options['verbose']),
           noBuilder: false,
           intent: options['intent'] as string | undefined,
         };
@@ -188,7 +193,12 @@ export function buildVerifyCommand(): Command {
           );
         }
         if (exit.warning && !flags.quiet) console.error(exit.warning);
-        process.exit(exit.exitCode);
+        // Setting the code and letting the loop drain, rather than
+        // process.exit(). Forcing exit while an HTTP handle is still closing
+        // trips a libuv assertion on Windows, which aborts the process and
+        // replaces the verdict's exit code with 127 — so a policy block came
+        // back looking like a crash to anything gating on it.
+        process.exitCode = exit.exitCode;
       } catch (err) {
         console.error(`${block('✕')} ${formatError(err)}`);
         process.exit(1);

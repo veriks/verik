@@ -34,7 +34,24 @@ export function createProvider(config: VerikConfig): LlmProvider {
 
   const baseUrl = config.baseUrl ?? spec.baseUrl;
   if (!baseUrl) {
-    logger.warn(`Provider "${spec.id}" needs a baseUrl in .verik/config.json.`);
+    logger.warn(
+      `Provider "${spec.id}" has no endpoint. Set baseUrl in .verik/config.json ` +
+        'or VERIK_BASE_URL.',
+    );
+    return new FakeProvider();
+  }
+
+  // A custom endpoint carries no default model ids, so an unconfigured one
+  // would post `"model": ""` and come back with a provider-specific error that
+  // says nothing about the actual cause.
+  const missing = (['scout', 'reviewer', 'judge'] as const).filter(
+    (s) => !config.models[s]?.trim(),
+  );
+  if (missing.length > 0) {
+    logger.warn(
+      `No model id configured for: ${missing.join(', ')}. Set "models" in ` +
+        '.verik/config.json or VERIK_MODEL_{SCOUT,REVIEWER,JUDGE}.',
+    );
     return new FakeProvider();
   }
 
