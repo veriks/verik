@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile, chmod, rm, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 
 /**
- * Installing crosscheck as a git pre-commit hook.
+ * Installing verik as a git pre-commit hook.
  *
  * Rules nobody runs catch nothing, and asking a developer to remember a command
  * after every agent session is asking them to be the reliability mechanism. The
@@ -14,12 +14,23 @@ import { dirname, isAbsolute, join, resolve } from 'node:path';
  *  - it must never destroy an existing hook. Most repositories that want this
  *    already run husky, lint-staged or pre-commit.
  *  - it must be exactly reversible, leaving no trace of having been there.
- *  - it must never block a commit because crosscheck itself failed. A tool that
+ *  - it must never block a commit because verik itself failed. A tool that
  *    stops you committing when it breaks is a tool you uninstall that morning.
  */
 
-export const BEGIN_MARKER = '# >>> crosscheck >>>';
-export const END_MARKER = '# <<< crosscheck <<<';
+export const BEGIN_MARKER = '# >>> verik >>>';
+export const END_MARKER = '# <<< verik <<<';
+
+/**
+ * Markers written before the tool was renamed.
+ *
+ * Someone who installed the hook under the old name must still be able to
+ * uninstall it. Without this, `hook uninstall` reports "nothing to remove"
+ * while the old block sits in their pre-commit calling a binary that no longer
+ * exists — the hook then fails on every commit and the documented way out does
+ * not work.
+ */
+const LEGACY_MARKERS = ['# >>> crosscheck >>>', '# <<< crosscheck <<<'] as const;
 
 export type HookState = 'absent' | 'installed' | 'foreign';
 
@@ -77,16 +88,26 @@ export async function resolveHookTarget(root: string): Promise<HookTarget> {
 /** An `exit` at the start of a line, outside our block — the hook stops there. */
 const UNCONDITIONAL_EXIT = /^exit\b/m;
 
+function splitOn(
+  content: string,
+  begin: string,
+  end: string,
+): { before: string; after: string; found: boolean } | null {
+  const start = content.indexOf(begin);
+  const stop = content.indexOf(end);
+  if (start === -1 || stop === -1 || stop < start) return null;
+  return { before: content.slice(0, start), after: content.slice(stop + end.length), found: true };
+}
+
 function splitBlock(content: string): { before: string; after: string; found: boolean } {
-  const start = content.indexOf(BEGIN_MARKER);
-  const end = content.indexOf(END_MARKER);
-  if (start === -1 || end === -1 || end < start)
-    return { before: content, after: '', found: false };
-  return {
-    before: content.slice(0, start),
-    after: content.slice(end + END_MARKER.length),
-    found: true,
-  };
+  return (
+    splitOn(content, BEGIN_MARKER, END_MARKER) ??
+    splitOn(content, LEGACY_MARKERS[0], LEGACY_MARKERS[1]) ?? {
+      before: content,
+      after: '',
+      found: false,
+    }
+  );
 }
 
 async function readHookFile(path: string): Promise<string | null> {
@@ -123,29 +144,29 @@ export async function readHookStatus(root: string): Promise<HookStatus> {
  * Output is captured and only printed when the commit is actually blocked, so a
  * passing commit stays silent — the same contract every other hook honours.
  * Exit codes are mapped deliberately rather than passed through: 2 and 3 are
- * crosscheck's "do not ship this" and "blocking mode could not reach a
- * verdict", and everything else means crosscheck itself had a problem, which is
+ * verik's "do not ship this" and "blocking mode could not reach a
+ * verdict", and everything else means verik itself had a problem, which is
  * not the developer's fault and must not cost them the commit.
  */
 export function renderHookBlock(mode: 'rules' | 'full'): string {
   return [
     BEGIN_MARKER,
-    '# Managed by `crosscheck hook install`.',
-    '# Remove with `crosscheck hook uninstall`, or delete this block by hand.',
-    'if command -v crosscheck >/dev/null 2>&1; then',
-    `  crosscheck_out=$(crosscheck verify --mode ${mode} 2>&1)`,
-    '  crosscheck_rc=$?',
-    '  case $crosscheck_rc in',
+    '# Managed by `verik hook install`.',
+    '# Remove with `verik hook uninstall`, or delete this block by hand.',
+    'if command -v verik >/dev/null 2>&1; then',
+    `  verik_out=$(verik verify --mode ${mode} 2>&1)`,
+    '  verik_rc=$?',
+    '  case $verik_rc in',
     '    0) : ;;',
     '    2|3)',
-    '      printf %s\\\\n "$crosscheck_out" >&2',
-    '      printf "\\ncrosscheck blocked this commit." >&2',
+    '      printf %s\\\\n "$verik_out" >&2',
+    '      printf "\\nverik blocked this commit." >&2',
     '      printf " Commit anyway with: git commit --no-verify\\n" >&2',
     '      exit 1',
     '      ;;',
     '    *)',
-    '      printf "crosscheck could not complete (exit %s) - allowing the commit.\\n" \\',
-    '        "$crosscheck_rc" >&2',
+    '      printf "verik could not complete (exit %s) - allowing the commit.\\n" \\',
+    '        "$verik_rc" >&2',
     '      ;;',
     '  esac',
     'fi',
@@ -197,8 +218,8 @@ export async function installHook(
   let backupPath: string | null = null;
   if (!found && foreignBody.length > 0) {
     // First time we touch someone else's hook, keep a copy. Reinstalls do not
-    // overwrite it, so the original is always the pre-crosscheck version.
-    backupPath = `${target.path}.crosscheck-backup`;
+    // overwrite it, so the original is always the pre-verik version.
+    backupPath = `${target.path}.verik-backup`;
     try {
       await stat(backupPath);
     } catch {

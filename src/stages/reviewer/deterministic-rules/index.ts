@@ -30,7 +30,7 @@ export interface DeterministicRule {
   title: string;
   /**
    * Severity this rule's findings carry before any policy remapping. Declared
-   * rather than derived so `crosscheck rules` can list the catalogue without
+   * rather than derived so `verik rules` can list the catalogue without
    * running a single rule against a diff.
    */
   defaultSeverity?: Severity;

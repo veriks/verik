@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { sha256 } from '../../shared/hashing.js';
 import { logger } from '../../shared/logger.js';
 
-const CACHE_DIR = '.crosscheck/cache';
+const CACHE_DIR = '.verik/cache';
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 interface CacheEntry<T> {

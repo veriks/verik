@@ -43,8 +43,8 @@ const HARDENED = [
   'diff.external=',
 ];
 
-/** Crosscheck's own run artifacts must never be attributed to the wrapped command. */
-const EXCLUDE_PATHSPECS = [':(exclude,glob).crosscheck/**', ':(exclude).crosscheck'];
+/** Verik's own run artifacts must never be attributed to the wrapped command. */
+const EXCLUDE_PATHSPECS = [':(exclude,glob).verik/**', ':(exclude).verik'];
 
 /** Diffs of large repositories comfortably exceed execa's default buffer. */
 const MAX_GIT_OUTPUT_BYTES = 256 * 1024 * 1024;
@@ -65,7 +65,7 @@ export interface TreeWorkspace {
  * The ambient environment minus the entire GIT_* namespace.
  *
  * Inherited git variables are actively hostile here. GIT_DIR, GIT_WORK_TREE and
- * GIT_INDEX_FILE are all set when crosscheck runs inside a git hook, and would
+ * GIT_INDEX_FILE are all set when verik runs inside a git hook, and would
  * retarget our plumbing at the hook's repository and index instead of ours. We
  * set every variable that matters below, so nothing of value is lost.
  */
@@ -129,7 +129,7 @@ export async function createTreeWorkspace(
   const raw = (await git(root, inheritedEnv(), ['rev-parse', '--git-path', 'objects'])).trim();
   const repoObjectDir = resolve(root, raw);
 
-  const dir = await mkdtemp(join(tmpdir(), 'crosscheck-tree-'));
+  const dir = await mkdtemp(join(tmpdir(), 'verik-tree-'));
   const objectDir = join(dir, 'objects');
   await mkdir(objectDir, { recursive: true });
 
@@ -145,17 +145,17 @@ export async function createTreeWorkspace(
 }
 
 /**
- * A durable object store owned by Crosscheck, at `.crosscheck/objects`.
+ * A durable object store owned by Verik, at `.verik/objects`.
  *
  * A checkpoint tree has to survive long after the process that wrote it — the
  * user may spend an hour prompting an IDE agent between `begin` and `verify` —
  * so it cannot live in the temp workspace. Writing it into `.git/objects` would
- * be simpler but breaks the invariant that Crosscheck never mutates the
+ * be simpler but breaks the invariant that Verik never mutates the
  * repository, so it gets its own store and is registered as a git alternate
  * when reading.
  */
 export async function ensureCheckpointStore(root: string): Promise<string> {
-  const dir = join(root, '.crosscheck', 'objects');
+  const dir = join(root, '.verik', 'objects');
   await mkdir(join(dir, 'info'), { recursive: true });
   await mkdir(join(dir, 'pack'), { recursive: true });
   return dir;
@@ -172,7 +172,7 @@ export async function writeCheckpointTree(
   const objectDir = await ensureCheckpointStore(root);
   const raw = (await git(root, inheritedEnv(), ['rev-parse', '--git-path', 'objects'])).trim();
   const repoObjectDir = resolve(root, raw);
-  const dir = await mkdtemp(join(tmpdir(), 'crosscheck-ckpt-'));
+  const dir = await mkdtemp(join(tmpdir(), 'verik-ckpt-'));
 
   // Objects go to the durable store; the index is throwaway.
   const ws: TreeWorkspace = {

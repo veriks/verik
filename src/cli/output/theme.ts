@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 
 /**
- * Crosscheck's visual identity, shared by every terminal surface.
+ * Verik's visual identity, shared by every terminal surface.
  *
  * These hex values mirror the HTML report (src/core/reports/report-renderer-html.ts)
  * so a verdict is the same colour whether you read it in the terminal or the
@@ -46,7 +46,7 @@ export const underline = paint(chalk.underline);
 export const MARK_RAW = '✓ ✕';
 export const mark = (): string => `${pass('✓')} ${block('✕')}`;
 
-export const wordmark = (): string => `${mark()}  ${bold('crosscheck')}`;
+export const wordmark = (): string => `${mark()}  ${bold('verik')}`;
 
 /** Total width of framed output, clamped so it stays readable in wide terminals. */
 export const frameWidth = (): number =>
@@ -100,7 +100,7 @@ export function box(title: string, body: string, tint: (s: string) => string): s
 }
 
 /**
- * Wordmark banner — the brand moment on `crosscheck` with no arguments.
+ * Wordmark banner — the brand moment on `verik` with no arguments.
  *
  * Deliberately not ASCII art. A box-drawing letterform depends on the terminal
  * font rendering ┌ ┬ ┴ ┘ at consistent widths with no gaps; in most default
@@ -111,7 +111,7 @@ export function box(title: string, body: string, tint: (s: string) => string): s
 export function banner(): string {
   return [
     '',
-    `  ${mark()}   ${bold(brand('crosscheck'))}`,
+    `  ${mark()}   ${bold(brand('verik'))}`,
     `  ${' '.repeat(MARK_RAW.length)}   ${muted('independent verification for AI-generated code')}`,
     '',
   ].join('\n');

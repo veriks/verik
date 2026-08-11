@@ -31,7 +31,7 @@ export async function getRepositoryInfo(dir: string): Promise<RepositoryInfo> {
   }
 
   // An unborn HEAD is a supported state, not an error. `git init` followed by
-  // `crosscheck init` is the first thing a new user does, and the tree
+  // `verik init` is the first thing a new user does, and the tree
   // machinery already handles it — `read-tree --empty` gives an empty baseline,
   // against which every file reads as added, which is exactly right for a
   // repository whose first commit has not happened yet.

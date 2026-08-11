@@ -1,21 +1,21 @@
 import { join } from 'node:path';
 
-export const CROSSCHECK_DIR = '.crosscheck';
+export const VERIK_DIR = '.verik';
 
-export function crosscheckDir(repoRoot: string): string {
-  return join(repoRoot, CROSSCHECK_DIR);
+export function verikDir(repoRoot: string): string {
+  return join(repoRoot, VERIK_DIR);
 }
 
 export function runsDir(repoRoot: string): string {
-  return join(repoRoot, CROSSCHECK_DIR, 'runs');
+  return join(repoRoot, VERIK_DIR, 'runs');
 }
 
 export function runDir(repoRoot: string, runId: string): string {
-  return join(repoRoot, CROSSCHECK_DIR, 'runs', runId);
+  return join(repoRoot, VERIK_DIR, 'runs', runId);
 }
 
 export function cacheDir(repoRoot: string): string {
-  return join(repoRoot, CROSSCHECK_DIR, 'cache');
+  return join(repoRoot, VERIK_DIR, 'cache');
 }
 
 export function runFilePath(repoRoot: string, runId: string, filename: string): string {

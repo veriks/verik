@@ -46,7 +46,7 @@ const CI_FILE =
 
 /** The gates a change has to pass through — including this tool's own. */
 export function isCiPath(path: string): boolean {
-  return CI_FILE.test(path) || /(^|\/)\.crosscheck\/policy\.json$/.test(path);
+  return CI_FILE.test(path) || /(^|\/)\.verik\/policy\.json$/.test(path);
 }
 
 /**

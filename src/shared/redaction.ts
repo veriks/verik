@@ -22,7 +22,7 @@ export function redactSecrets(text: string): string {
 /**
  * The wrapped command as it is safe to display or send.
  *
- * Credentials on an agent's command line are ordinary — `crosscheck run --
+ * Credentials on an agent's command line are ordinary — `verik run --
  * deploy --token=…` — and the argv was being echoed verbatim into report.md,
  * report.json, report.html and the Scout prompt. Same leak as an unsanitised
  * diff, different channel.
@@ -33,7 +33,9 @@ export function redactCommandLine(argv: string[]): string {
   return redactSecrets(argv.join(' '));
 }
 
-export function redactEnvironmentValues(env: Record<string, string | undefined>): Record<string, string> {
+export function redactEnvironmentValues(
+  env: Record<string, string | undefined>,
+): Record<string, string> {
   const result: Record<string, string> = {};
   for (const [key, value] of Object.entries(env)) {
     result[key] = value ? REDACTION_PLACEHOLDER : '';

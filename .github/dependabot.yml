@@ -1,6 +1,6 @@
 version: 2
 
-# Crosscheck is installed globally and runs in CI with ANTHROPIC_API_KEY in the
+# Verik is installed globally and runs in CI with ANTHROPIC_API_KEY in the
 # environment, so a compromised transitive dependency is a direct path to a
 # user's source code and their key. Dependency freshness is a security control.
 #

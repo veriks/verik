@@ -9,7 +9,7 @@ export interface ScoutPrompt {
 export function buildScoutPrompt(context: RunContext): ScoutPrompt {
   const { diff, record, selectedContext } = context;
 
-  const system = `You are Scout, the first stage in the Crosscheck verification pipeline.
+  const system = `You are Scout, the first stage in the Verik verification pipeline.
 Your job is to understand the scope, intent, and risk profile of a code change produced by an AI coding agent.
 
 Be factual. Cite file paths and diff evidence for your conclusions.
@@ -38,15 +38,18 @@ Respond ONLY with structured JSON matching the provided schema.`;
     : '';
 
   const fileContents = selectedContext?.changedFiles.length
-    ? '\n\nCHANGED FILE CONTENTS:\n' + selectedContext.changedFiles
-        .map((f) => `--- ${f.path} (lines ${f.startLine}-${f.endLine}${f.truncated ? ', truncated' : ''}) ---\n${f.content}`)
+    ? '\n\nCHANGED FILE CONTENTS:\n' +
+      selectedContext.changedFiles
+        .map(
+          (f) =>
+            `--- ${f.path} (lines ${f.startLine}-${f.endLine}${f.truncated ? ', truncated' : ''}) ---\n${f.content}`,
+        )
         .join('\n\n')
     : '';
 
   const manifests = selectedContext?.manifestFiles.length
-    ? '\n\nPROJECT MANIFESTS:\n' + selectedContext.manifestFiles
-        .map((f) => `--- ${f.path} ---\n${f.content}`)
-        .join('\n\n')
+    ? '\n\nPROJECT MANIFESTS:\n' +
+      selectedContext.manifestFiles.map((f) => `--- ${f.path} ---\n${f.content}`).join('\n\n')
     : '';
 
   const limitations = selectedContext?.limitations.length

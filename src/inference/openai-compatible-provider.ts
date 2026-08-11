@@ -210,7 +210,7 @@ export class OpenAICompatibleProvider implements LlmProvider {
       }
       if (res.status === 404) {
         throw new ProviderError(
-          `${this.providerId} has no model "${request.model}" (404). Check the model id in .crosscheck/config.json.`,
+          `${this.providerId} has no model "${request.model}" (404). Check the model id in .verik/config.json.`,
         );
       }
       throw new Error(`${res.status}: ${detail}`);

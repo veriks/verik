@@ -1,5 +1,5 @@
 import type { LlmProvider } from './llm-provider.js';
-import type { CrosscheckConfig } from '../config/config-schema.js';
+import type { VerikConfig } from '../config/config-schema.js';
 import { AnthropicProvider } from './anthropic-provider.js';
 import { OpenAICompatibleProvider } from './openai-compatible-provider.js';
 import { FakeProvider } from './fake-provider.js';
@@ -16,7 +16,7 @@ import { logger } from '../shared/logger.js';
  * pipeline already treats a failing stage as inconclusive rather than passing,
  * so a missing key degrades honestly instead of inventing a verdict.
  */
-export function createProvider(config: CrosscheckConfig): LlmProvider {
+export function createProvider(config: VerikConfig): LlmProvider {
   const spec = PROVIDERS[config.provider];
   if (!spec) {
     logger.warn(`Unknown provider "${config.provider}" — LLM stages will not run.`);
@@ -34,7 +34,7 @@ export function createProvider(config: CrosscheckConfig): LlmProvider {
 
   const baseUrl = config.baseUrl ?? spec.baseUrl;
   if (!baseUrl) {
-    logger.warn(`Provider "${spec.id}" needs a baseUrl in .crosscheck/config.json.`);
+    logger.warn(`Provider "${spec.id}" needs a baseUrl in .verik/config.json.`);
     return new FakeProvider();
   }
 

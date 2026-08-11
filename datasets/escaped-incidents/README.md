@@ -1,6 +1,6 @@
 # datasets/escaped-incidents/
 
-Real incidents where a Crosscheck verdict passed (or was overridden) but the change
+Real incidents where a Verik verdict passed (or was overridden) but the change
 caused a production issue.
 
 Each entry records:
@@ -19,7 +19,7 @@ They feed directly into `rule-training/` and inform confidence calibration.
 ```json
 {
   "incidentId": "inc_...",
-  "runId": "ccr_...",
+  "runId": "vk_...",
   "repositoryRemote": "https://github.com/...",
   "occurredAt": "2026-01-15T00:00:00Z",
   "verdict": "pass",

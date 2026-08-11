@@ -1,4 +1,4 @@
-import type { CrosscheckConfig, PolicyConfig } from '../../config/config-schema.js';
+import type { VerikConfig, PolicyConfig } from '../../config/config-schema.js';
 import type { RepositorySnapshot } from '../repository/repository-snapshot.js';
 import type { DiffResult } from '../repository/diff-capture.js';
 import type { RunRecord } from './run-state.js';
@@ -10,7 +10,7 @@ export interface RunContext {
   runId: string;
   repoRoot: string;
   repoId: string;
-  config: CrosscheckConfig;
+  config: VerikConfig;
   policy: PolicyConfig;
   wrappedCommand: string[];
   intent?: string;

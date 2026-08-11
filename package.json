@@ -1,11 +1,11 @@
 {
-  "name": "crosscheck",
+  "name": "verik",
   "version": "0.1.0",
   "description": "Independent verification runtime for AI-generated code",
   "type": "module",
   "engines": { "node": ">=20" },
   "bin": {
-    "crosscheck": "./dist/index.js"
+    "verik": "./dist/index.js"
   },
   "files": [
     "dist",
@@ -78,7 +78,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/crosscheck-sh/crosscheck"
+    "url": "https://github.com/verik-sh/verik"
   },
   "packageManager": "pnpm@9.12.0"
 }

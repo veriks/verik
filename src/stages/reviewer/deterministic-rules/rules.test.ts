@@ -340,9 +340,9 @@ describe('repo integrity rules', () => {
     expect(deleted[0]!.severity).toBe('high');
   });
 
-  it("flags a change to crosscheck's own policy file", async () => {
+  it("flags a change to verik's own policy file", async () => {
     const found = await CiWorkflowModifiedRule.run(
-      fileCtx([{ path: '.crosscheck/policy.json', changeType: 'modified' }]),
+      fileCtx([{ path: '.verik/policy.json', changeType: 'modified' }]),
     );
     expect(found).toHaveLength(1);
   });

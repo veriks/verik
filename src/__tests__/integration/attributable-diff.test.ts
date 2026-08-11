@@ -156,17 +156,17 @@ describe('attributable diff', () => {
     expect(diff.patch).toBe('');
   });
 
-  it('never attributes crosscheck run artifacts to the command', async () => {
+  it('never attributes verik run artifacts to the command', async () => {
     repo = await createTestRepo();
     await initWithCommit(repo, 'README.md', '# hi');
 
     const diff = await withCommand(repo, async () => {
-      await repo.write('.crosscheck/runs/ccr_x/metadata.json', '{"runId":"ccr_x"}');
+      await repo.write('.verik/runs/vk_x/metadata.json', '{"runId":"vk_x"}');
       await repo.write('src/real.ts', 'export const r = 1;');
     });
 
     expect(diff.commandIntroducedPaths.map(norm)).toEqual(['src/real.ts']);
-    expect(diff.patch).not.toContain('.crosscheck');
+    expect(diff.patch).not.toContain('.verik');
   });
 
   it('leaves the repository untouched', async () => {
@@ -247,7 +247,7 @@ describe('getRepositoryInfo', () => {
     // createTestRepo() runs `git init`, so it is NOT a non-git directory — the
     // old version of this test was mislabelled and actually asserted the unborn
     // -HEAD throw that has since been removed. Use a genuinely bare directory.
-    const bare = join(tmpdir(), `crosscheck-notgit-${Date.now()}`);
+    const bare = join(tmpdir(), `verik-notgit-${Date.now()}`);
     await mkdir(bare, { recursive: true });
     try {
       await expect(getRepositoryInfo(bare)).rejects.toThrow(/not a git repository/i);
@@ -257,7 +257,7 @@ describe('getRepositoryInfo', () => {
   });
 
   it('treats an unborn HEAD as a supported state, not an error', async () => {
-    // `git init` then `crosscheck init` is the first thing a new user does.
+    // `git init` then `verik init` is the first thing a new user does.
     // Every file reads as added against an empty baseline, which is correct for
     // a repository whose first commit has not happened yet.
     repo = await createTestRepo();

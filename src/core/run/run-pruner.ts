@@ -6,7 +6,7 @@ import { logger } from '../../shared/logger.js';
 /**
  * Delete oldest run directories beyond the configured keep limit.
  * Runs are sorted newest-first by directory name (IDs are time-prefixed).
- * This keeps `.crosscheck/runs/` from growing forever.
+ * This keeps `.verik/runs/` from growing forever.
  */
 export async function pruneOldRuns(repoRoot: string, keepCount: number): Promise<void> {
   if (keepCount <= 0) return;

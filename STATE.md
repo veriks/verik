@@ -1,8 +1,8 @@
-# Crosscheck — State & Handoff
+# Verik — State & Handoff
 
 **Last verified:** 9 August 2026
 **Branch:** `feat/tree-attribution-and-privacy-seam` → `main`
-**Remote:** https://github.com/crosscheck-sh/crosscheck (private)
+**Remote:** https://github.com/verik-sh/verik (private)
 
 This document is written for someone picking the project up cold, with their own
 Claude. Everything below was verified by running it, not recalled. Where something
@@ -22,7 +22,7 @@ produced, and independently verifies those changes through four isolated stages,
 each a separate LLM call or deterministic pass.
 
 ```
-crosscheck run -- claude -p "add password reset"
+verik run -- claude -p "add password reset"
 ```
 
 The premise: **the system that writes the code should not be the only system
@@ -81,7 +81,7 @@ pnpm test
    (tracked, staged and untracked alike), written to a temp index and temp object
    store so the repository is never touched. This is the baseline.
 2. **Run the wrapped command** — transparent subprocess; stdin inherited, signals
-   forwarded, colours preserved. The agent has no idea Crosscheck exists.
+   forwarded, colours preserved. The agent has no idea Verik exists.
 3. **Snapshot after** — build a second tree and `git diff baseline final`. That
    *is* the attributable diff: pre-existing dirt is already baked into the
    baseline tree, so everything the diff reports is by construction the command's
@@ -100,7 +100,7 @@ pnpm test
    - **Judge** (LLM) — reads everything prior, returns `pass` / `warn` / `block` /
      `inconclusive`, and may dismiss Reviewer findings it considers unsupported.
    - **Policy engine** (deterministic) — applies thresholds, determines exit code.
-5. **Persist** — JSON, Markdown and HTML reports under `.crosscheck/runs/<id>/`;
+5. **Persist** — JSON, Markdown and HTML reports under `.verik/runs/<id>/`;
    findings written to memory for future runs.
 
 ### Engineering invariants — do not violate
@@ -112,8 +112,8 @@ pnpm test
    command, but Builder runs `package.json` scripts, which the wrapped agent may
    have just rewritten.
 4. Deterministic evidence outranks model opinion.
-5. Crosscheck never mutates the repository during verification. **True of
-   Crosscheck itself** — tree building uses a temp index and temp object store,
+5. Verik never mutates the repository during verification. **True of
+   Verik itself** — tree building uses a temp index and temp object store,
    asserted by a test. Not true of the Builder, which runs your real
    build/test and so can write `dist/`, coverage and snapshots.
 6. A stage that did not execute is never reported as passed. Extended: a check
@@ -167,7 +167,7 @@ src/
 
 datasets/         THREE EMPTY READMEs — see §7
 scripts/          install.sh (curl installer), pkg-build.mjs (binaries)
-.github/workflows/ ci.yml, crosscheck.yml, release.yml
+.github/workflows/ ci.yml, verik.yml, release.yml
 ```
 
 ---
@@ -183,15 +183,15 @@ Stages are tiered by the capability each needs. Defaults live in
 | Reviewer | `claude-sonnet-5` | The analysis pass |
 | Judge | `claude-opus-5` | The verdict is the product |
 
-**Resolution precedence:** `CROSSCHECK_MODEL_<STAGE>` env var → `config.json` →
+**Resolution precedence:** `VERIK_MODEL_<STAGE>` env var → `config.json` →
 the default above. The string `configured-through-environment` is a legacy
-placeholder written by older `crosscheck init` runs and is treated as "unset".
+placeholder written by older `verik init` runs and is treated as "unset".
 
 > **Trap:** Sonnet 5 and Opus 5 think by default, and `max_tokens` caps thinking
 > *plus* response together. Reviewer and Judge are set to 16k for this reason.
 > If you lower them, verdicts will truncate mid-sentence.
 
-Policy (`.crosscheck/policy.json`): `shadow` (always exit 0), `advisory`
+Policy (`.verik/policy.json`): `shadow` (always exit 0), `advisory`
 (default — show findings, never block), `blocking` (exit 2 on block).
 
 Exit codes: `0` pass/advisory · `1` internal error · `2` policy block ·
@@ -228,7 +228,7 @@ runner was missing. That was wrong — there is nothing to run. Building this is
 the highest-value work available, and the way to build it is by hand-labelling
 real output (§8).
 
-**Not published to npm.** `npm install -g crosscheck` does not resolve. The name
+**Not published to npm.** `npm install -g verik` does not resolve. The name
 is free (verified: registry returns 404). Needs `NPM_TOKEN` in repo secrets and a
 `v*` tag push to fire `release.yml`.
 
@@ -239,7 +239,7 @@ chain the docs describe is half-wired.
 
 **Untested / unmeasured:**
 - Cost and latency per run — `tokenUsage` is captured per stage and shown in
-  `crosscheck inspect`, but never summed or priced. You cannot currently answer
+  `verik inspect`, but never summed or priced. You cannot currently answer
   "what does a run cost?"
 - The 60K-token context budget on very large diffs.
 - `zodToJsonSchema` against every stage schema on real API responses.
@@ -261,7 +261,7 @@ chain the docs describe is half-wired.
 - Builder commands are split on spaces, so a custom command with a quoted
   argument breaks; and `SHELL_OPERATORS` rejects `\`, so no Windows path can be
   configured.
-- `crosscheck verify` does not write `diff.patch`, though `run` does.
+- `verik verify` does not write `diff.patch`, though `run` does.
 - `pnpm format:check` currently fails on ~41 files of pre-existing style drift,
   so the CI `Format check` step is red independently of any change. On Windows
   this looks far worse than it is: with `core.autocrlf=true`, no `.gitattributes`
@@ -280,7 +280,7 @@ chain the docs describe is half-wired.
 Do **not** build the eval harness first — you cannot automate a judgement you
 have not made by hand yet.
 
-Take 15–20 real agent-generated diffs. Run `crosscheck verify` on each with a
+Take 15–20 real agent-generated diffs. Run `verik verify` on each with a
 real key. Read every finding and label it true or false positive. That single
 exercise yields three things at once: the precision number that decides whether
 this is a product, the labelled ground truth that *becomes* `datasets/evaluation/`,
@@ -388,7 +388,7 @@ Builder limitations are now also passed to the Reviewer and Judge prompts, which
 never saw them.
 
 **Deliberate design choices, so they are not "fixed" by mistake:**
-- `.crosscheck/runs/<id>/diff.patch` stays **unredacted**. It is gitignored,
+- `.verik/runs/<id>/diff.patch` stays **unredacted**. It is gitignored,
   local, and a redacted forensic artifact is worse than useless when triaging a
   leak. Everything that leaves the machine is sanitised; this does not leave.
 - `commandIntroducedPaths` and `preExistingChangedPaths` may now **overlap**.
@@ -400,7 +400,7 @@ never saw them.
   (`-c core.pager`, `-c diff.external`) and any inherited `GIT_EDITOR` or
   `SSH_ASKPASS`. Every argv there is a compile-time constant. The module also
   strips the whole `GIT_*` namespace from the child environment, so running
-  Crosscheck inside a git hook cannot retarget the plumbing at the hook's
+  Verik inside a git hook cannot retarget the plumbing at the hook's
   repository via an inherited `GIT_DIR` or `GIT_INDEX_FILE`.
 
 **Verified by running it, not by reading it:** 74 tests pass, including a

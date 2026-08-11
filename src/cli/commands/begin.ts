@@ -12,7 +12,7 @@ import { brand, muted, pass, section, subtle } from '../output/theme.js';
 import { checklist } from '../output/prompt.js';
 
 /**
- * `crosscheck begin` — mark the baseline before letting an agent work.
+ * `verik begin` — mark the baseline before letting an agent work.
  *
  * For agents that cannot be wrapped: Cursor, Copilot, the Claude or ChatGPT
  * desktop apps, anything where code arrives by paste. Without this, `verify`
@@ -58,11 +58,9 @@ export function buildBeginCommand(): Command {
 
         console.log(`\n  ${muted('Now let the agent work, then:')}`);
         console.log(
-          `    ${brand('crosscheck verify')}${muted('   verifies only what changed since this point')}`,
+          `    ${brand('verik verify')}${muted('   verifies only what changed since this point')}`,
         );
-        console.log(
-          `    ${brand('crosscheck begin --clear')}${muted('   discard the baseline')}\n`,
-        );
+        console.log(`    ${brand('verik begin --clear')}${muted('   discard the baseline')}\n`);
       } catch (err) {
         console.error(`${block('✕')} ${formatError(err)}`);
         process.exit(1);

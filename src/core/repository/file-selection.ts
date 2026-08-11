@@ -3,8 +3,8 @@ import type { ChangedFile } from './diff-capture.js';
 
 const ALWAYS_EXCLUDED = [
   '.git/**',
-  '.crosscheck/runs/**',
-  '.crosscheck/cache/**',
+  '.verik/runs/**',
+  '.verik/cache/**',
   'node_modules/**',
   'vendor/**',
   'dist/**',
@@ -19,10 +19,7 @@ export function isExcluded(filePath: string, extraPatterns: string[]): boolean {
   return patterns.some((p) => minimatch(filePath, p, { dot: true }));
 }
 
-export function filterFiles(
-  files: ChangedFile[],
-  excludePatterns: string[],
-): ChangedFile[] {
+export function filterFiles(files: ChangedFile[], excludePatterns: string[]): ChangedFile[] {
   return files.filter((f) => !isExcluded(f.path, excludePatterns));
 }
 

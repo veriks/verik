@@ -3,4 +3,4 @@ packages:
 onlyBuiltDependencies:
   - esbuild
 overrides:
-  crosscheck: 'link:'
+  verik: 'link:'

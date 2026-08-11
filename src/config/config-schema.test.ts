@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { CrosscheckConfigSchema, PolicyConfigSchema } from '../config/config-schema.js';
+import { VerikConfigSchema, PolicyConfigSchema } from '../config/config-schema.js';
 
-describe('CrosscheckConfigSchema', () => {
+describe('VerikConfigSchema', () => {
   it('parses minimal config', () => {
-    const result = CrosscheckConfigSchema.safeParse({ version: 1 });
+    const result = VerikConfigSchema.safeParse({ version: 1 });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.provider).toBe('anthropic');
@@ -12,7 +12,7 @@ describe('CrosscheckConfigSchema', () => {
   });
 
   it('rejects invalid version', () => {
-    const result = CrosscheckConfigSchema.safeParse({ version: 2 });
+    const result = VerikConfigSchema.safeParse({ version: 2 });
     expect(result.success).toBe(false);
   });
 });

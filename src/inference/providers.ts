@@ -9,7 +9,7 @@
  *
  * Deliberately no model defaults outside Anthropic: model identifiers change
  * often and vary per host, and a wrong default fails at the first real request
- * with a confusing 404. `crosscheck init` and `crosscheck doctor` ask for them
+ * with a confusing 404. `verik init` and `verik doctor` ask for them
  * instead of guessing.
  */
 
@@ -123,9 +123,9 @@ export const PROVIDERS: Record<ProviderId, ProviderSpec> = {
   custom: {
     id: 'custom',
     label: 'Custom OpenAI-compatible endpoint',
-    apiKeyEnv: 'CROSSCHECK_API_KEY',
+    apiKeyEnv: 'VERIK_API_KEY',
     keyOptional: true,
-    docs: 'Set provider.baseUrl in .crosscheck/config.json',
+    docs: 'Set provider.baseUrl in .verik/config.json',
   },
 };
 
@@ -134,9 +134,9 @@ export const PROVIDER_IDS = Object.keys(PROVIDERS) as ProviderId[];
 /**
  * Resolves the API key for a provider.
  *
- * CROSSCHECK_API_KEY wins so a single variable can drive any provider in CI
+ * VERIK_API_KEY wins so a single variable can drive any provider in CI
  * without the workflow needing to know which one is configured.
  */
 export function resolveApiKey(spec: ProviderSpec): string | undefined {
-  return process.env['CROSSCHECK_API_KEY'] || process.env[spec.apiKeyEnv] || undefined;
+  return process.env['VERIK_API_KEY'] || process.env[spec.apiKeyEnv] || undefined;
 }

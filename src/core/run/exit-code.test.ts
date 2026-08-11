@@ -19,7 +19,7 @@ describe('resolveExit', () => {
 
   it('does not mask a failing wrapped command when the verdict passes', () => {
     // The regression: advisory mode used to discard the command's exit code, so
-    // `crosscheck run -- npm test` with failing tests reported success.
+    // `verik run -- npm test` with failing tests reported success.
     const r = resolveExit({ ...base, commandExitCode: 1 });
     expect(r.exitCode).toBe(1);
   });
@@ -41,7 +41,7 @@ describe('resolveExit', () => {
   });
 
   it('keeps advisory at 0 when verification did not complete', () => {
-    // Advisory promises never to fail a build on Crosscheck's opinion.
+    // Advisory promises never to fail a build on Verik's opinion.
     const r = resolveExit({ ...base, policy: undefined, stageStatuses: { judge: 'failed' } });
     expect(r.exitCode).toBe(0);
   });

@@ -56,7 +56,7 @@ describe('installHook', () => {
 
     const content = await readHook(result.target.path);
     expect(content.startsWith('#!')).toBe(true);
-    expect(content).toContain('crosscheck verify --mode rules');
+    expect(content).toContain('verik verify --mode rules');
     expect(result.previousState).toBe('absent');
 
     // Git silently ignores a hook that is not executable. Windows has no
@@ -80,7 +80,7 @@ describe('installHook', () => {
   it('honours the mode it was installed with', async () => {
     repo = await createTestRepo();
     const result = await installHook(repo.root, { mode: 'full' });
-    expect(await readHook(result.target.path)).toContain('crosscheck verify --mode full');
+    expect(await readHook(result.target.path)).toContain('verik verify --mode full');
   });
 
   it('preserves an existing hook and backs it up', async () => {
@@ -137,7 +137,7 @@ describe('installHook', () => {
 
     const first = await installHook(repo.root);
     await installHook(repo.root);
-    // The backup must stay the pre-crosscheck version, not a copy of our own
+    // The backup must stay the pre-verik version, not a copy of our own
     // output from the first install.
     expect(await readHook(first.backupPath!)).toBe('#!/bin/sh\noriginal\n');
   });
@@ -174,7 +174,7 @@ describe('uninstallHook', () => {
     expect(result.fileDeleted).toBe(false);
     expect(result.restoredForeignContent).toBe(true);
     expect(await readHook(target.path)).toBe(original);
-    expect(await readHook(target.path)).not.toContain('crosscheck');
+    expect(await readHook(target.path)).not.toContain('verik');
   });
 
   it('reports honestly when there is nothing of ours to remove', async () => {
@@ -226,23 +226,23 @@ describe('readHookStatus', () => {
 });
 
 describe('the generated hook script', () => {
-  it('blocks only on a policy verdict, never on a crosscheck failure', async () => {
+  it('blocks only on a policy verdict, never on a verik failure', async () => {
     repo = await createTestRepo();
     const { target } = await installHook(repo.root);
     const script = await readHook(target.path);
 
     // 2 = policy block, 3 = blocking mode with no verdict. Anything else is
-    // crosscheck's own problem and must not cost the developer their commit.
+    // verik's own problem and must not cost the developer their commit.
     expect(script).toContain('2|3)');
     expect(script).toContain('exit 1');
     expect(script).toMatch(/could not complete/);
     expect(script).toContain('--no-verify');
   });
 
-  it('does nothing when crosscheck is not on PATH', async () => {
+  it('does nothing when verik is not on PATH', async () => {
     repo = await createTestRepo();
     const { target } = await installHook(repo.root);
-    expect(await readHook(target.path)).toContain('command -v crosscheck');
+    expect(await readHook(target.path)).toContain('command -v verik');
   });
 
   it('is delimited so uninstall can find it exactly', async () => {

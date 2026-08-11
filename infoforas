@@ -1,19 +1,19 @@
-You are the founding engineer responsible for building Crosscheck from an empty repository.
+You are the founding engineer responsible for building Verik from an empty repository.
 
-Crosscheck is an independent verification runtime for AI-generated code.
+Verik is an independent verification runtime for AI-generated code.
 
 The central thesis is:
 
 The system writing code should not be the only system deciding whether that code is safe to ship.
 
-Crosscheck allows a developer to execute any coding agent or development command through a local CLI:
+Verik allows a developer to execute any coding agent or development command through a local CLI:
 
-    crosscheck run -- claude
-    crosscheck run -- codex
-    crosscheck run -- aider
-    crosscheck run -- <any command and arguments>
+    verik run -- claude
+    verik run -- codex
+    verik run -- aider
+    verik run -- <any command and arguments>
 
-Crosscheck records the repository before the command runs, executes the command transparently, captures the resulting repository changes, and independently verifies those changes through four isolated stages:
+Verik records the repository before the command runs, executes the command transparently, captures the resulting repository changes, and independently verifies those changes through four isolated stages:
 
     Scout
     Builder
@@ -32,18 +32,18 @@ The CLI and verification engine must be designed so those integrations can call 
 
 The primary command is:
 
-    crosscheck run -- <command> [arguments...]
+    verik run -- <command> [arguments...]
 
 Example:
 
-    crosscheck run -- claude -p "Add password reset support"
+    verik run -- claude -p "Add password reset support"
 
 Expected lifecycle:
 
 1. Validate that the current directory is a supported Git repository.
 2. Inspect the current repository state.
 3. Capture a baseline snapshot before executing the child command.
-4. Start a Crosscheck run.
+4. Start a Verik run.
 5. Execute the supplied command in an interactive subprocess.
 6. Preserve stdin, stdout, stderr, terminal colors, signals, and exit code behavior.
 7. Wait for the child command to finish.
@@ -56,55 +56,55 @@ Expected lifecycle:
 14. Execute Judge.
 15. Print a concise terminal verdict.
 16. Store the full evidence report locally.
-17. Exit using a documented Crosscheck exit code.
+17. Exit using a documented Verik exit code.
 
-Crosscheck must not require the wrapped command to know that Crosscheck exists.
+Verik must not require the wrapped command to know that Verik exists.
 
 This must work:
 
-    crosscheck run -- bash
-    crosscheck run -- npm run generate
-    crosscheck run -- python script.py
-    crosscheck run -- claude
-    crosscheck run -- codex
+    verik run -- bash
+    verik run -- npm run generate
+    verik run -- python script.py
+    verik run -- claude
+    verik run -- codex
 
-The double dash marks the end of Crosscheck options and the beginning of the wrapped command.
+The double dash marks the end of Verik options and the beginning of the wrapped command.
 
 Additional commands:
 
-    crosscheck verify
-    crosscheck report
-    crosscheck explain
-    crosscheck status
-    crosscheck init
-    crosscheck config
-    crosscheck version
+    verik verify
+    verik report
+    verik explain
+    verik status
+    verik init
+    verik config
+    verik version
 
 Behavior:
 
-    crosscheck verify
+    verik verify
 
 Verifies the current uncommitted Git diff without executing another command.
 
-    crosscheck report
+    verik report
 
 Prints the most recent complete report.
 
-    crosscheck report <run-id>
+    verik report <run-id>
 
 Prints a specific historical report.
 
-    crosscheck explain
+    verik explain
 
 Explains the latest verdict in plain English.
 
-    crosscheck status
+    verik status
 
 Shows whether the current repository is configured, the latest run, provider status, and repository state.
 
-    crosscheck init
+    verik init
 
-Creates a `.crosscheck` directory and a readable configuration file.
+Creates a `.verik` directory and a readable configuration file.
 
 ==================================================
 2. TECHNOLOGY
@@ -138,7 +138,7 @@ The first version should run locally with:
 
 The installed binary should be:
 
-    crosscheck
+    verik
 
 Do not hard-code one LLM provider directly into business logic.
 
@@ -149,9 +149,9 @@ Initially implement an Anthropic-compatible provider using environment variables
 Expected environment configuration:
 
     ANTHROPIC_API_KEY=
-    CROSSCHECK_MODEL_SCOUT=
-    CROSSCHECK_MODEL_REVIEWER=
-    CROSSCHECK_MODEL_JUDGE=
+    VERIK_MODEL_SCOUT=
+    VERIK_MODEL_REVIEWER=
+    VERIK_MODEL_JUDGE=
 
 Builder should not require an LLM for ordinary build/test execution.
 
@@ -246,12 +246,12 @@ Suggested structure:
 Do not follow this structure blindly if a cleaner implementation becomes obvious, but preserve the separation of concerns.
 
 ==================================================
-4. LOCAL CROSSCHECK DIRECTORY
+4. LOCAL VERIK DIRECTORY
 ==================================================
 
-`crosscheck init` should create:
+`verik init` should create:
 
-    .crosscheck/
+    .verik/
       config.json
       policy.json
       runs/
@@ -260,7 +260,7 @@ Do not follow this structure blindly if a cleaner implementation becomes obvious
 
 The project should normally ignore generated run data.
 
-Suggested `.crosscheck/.gitignore`:
+Suggested `.verik/.gitignore`:
 
     runs/
     cache/
@@ -334,7 +334,7 @@ Every run must have a stable generated ID.
 
 Example:
 
-    ccr_01J...
+    vk_01J...
 
 Persist a structured record containing:
 
@@ -369,7 +369,7 @@ Do not require a database.
 
 Store runs under:
 
-    .crosscheck/runs/<run-id>/
+    .verik/runs/<run-id>/
 
 Example:
 
@@ -392,7 +392,7 @@ A partial or failed verification must still leave a useful report.
 6. COMMAND EXECUTION
 ==================================================
 
-`crosscheck run -- ...` must behave like a transparent wrapper.
+`verik run -- ...` must behave like a transparent wrapper.
 
 Requirements:
 
@@ -418,7 +418,7 @@ Design and test for this.
 7. REPOSITORY SNAPSHOTS AND DIFFS
 ==================================================
 
-Crosscheck must distinguish:
+Verik must distinguish:
 
 - changes that existed before the wrapped command
 - changes introduced during the wrapped command
@@ -455,7 +455,7 @@ But the implementation must handle:
 Never upload:
 
 - `.git`
-- `.crosscheck/runs`
+- `.verik/runs`
 - dependency directories
 - build artifacts unless explicitly relevant
 - secrets or excluded files
@@ -620,7 +620,7 @@ Python:
 - compile/import validation where safe
 
 Generic:
-- explicitly configured commands from `.crosscheck/config.json`
+- explicitly configured commands from `.verik/config.json`
 
 Never automatically run arbitrary scripts merely because they exist.
 
@@ -692,7 +692,7 @@ Never treat "could not run" as "passed."
 
 Before the LLM Reviewer, implement a small deterministic rule engine.
 
-This is not required to recreate every historical Crosscheck rule immediately.
+This is not required to recreate every historical Verik rule immediately.
 
 Create a clean extension interface:
 
@@ -920,10 +920,10 @@ It produces:
       "overrideAvailable": true
     }
 
-Suggested Crosscheck exit codes:
+Suggested Verik exit codes:
 
 - 0: allowed/pass
-- 1: internal Crosscheck error
+- 1: internal Verik error
 - 2: policy denied/block
 - 3: verification inconclusive
 - 4: invalid configuration
@@ -941,8 +941,8 @@ The terminal output should feel serious, compact, and useful.
 
 Example:
 
-    Crosscheck
-    Run ccr_01J...
+    Verik
+    Run vk_01J...
 
     Command
       claude -p "Add password reset support"
@@ -971,7 +971,7 @@ Example:
     Test: "rejects reuse of reset token" failed
 
     Full report:
-      .crosscheck/runs/ccr_01J.../report.md
+      .verik/runs/vk_01J.../report.md
 
 Use symbols and colors when TTY supports them.
 
@@ -1105,7 +1105,7 @@ If context is truncated, stages must report that limitation.
 19. PRIVACY AND SAFETY
 ==================================================
 
-Crosscheck handles private source code.
+Verik handles private source code.
 
 Requirements:
 
@@ -1147,11 +1147,11 @@ Handle:
 - report storage failure
 - malformed config
 
-Crosscheck must give a useful message and preserve as much evidence as possible.
+Verik must give a useful message and preserve as much evidence as possible.
 
 If no changes were produced:
 
-    Crosscheck: no repository changes detected.
+    Verik: no repository changes detected.
 
 Do not spend model tokens unless explicitly requested.
 
@@ -1177,7 +1177,7 @@ Unit tests:
 
 Integration tests:
 
-- `crosscheck run -- node script-that-edits-a-file.js`
+- `verik run -- node script-that-edits-a-file.js`
 - pre-existing dirty file is not attributed to wrapped command
 - wrapped command adds a file
 - wrapped command deletes a file
@@ -1233,10 +1233,10 @@ README must show:
     pnpm install
     pnpm build
     export ANTHROPIC_API_KEY=...
-    crosscheck init
-    crosscheck run -- claude
-    crosscheck verify
-    crosscheck report
+    verik init
+    verik run -- claude
+    verik verify
+    verik report
 
 Include a diagram:
 
@@ -1267,7 +1267,7 @@ Build this incrementally.
 Milestone 1:
 - repository scaffolding
 - CLI
-- `crosscheck init`
+- `verik init`
 - config loading
 - run storage
 - transparent command execution
@@ -1319,15 +1319,15 @@ Do not jump to later integrations.
 25. DEFINITION OF DONE
 ==================================================
 
-The initial Crosscheck release is done when this works:
+The initial Verik release is done when this works:
 
 1. Start in a fixture repository.
 2. Run:
 
-       crosscheck run -- node modify-repository.js
+       verik run -- node modify-repository.js
 
 3. The child command runs normally.
-4. Crosscheck correctly identifies only the changes introduced by that command.
+4. Verik correctly identifies only the changes introduced by that command.
 5. Scout returns valid structured scope/risk.
 6. Builder detects and executes relevant safe project checks.
 7. Deterministic rules produce evidence.

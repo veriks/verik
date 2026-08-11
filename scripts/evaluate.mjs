@@ -64,8 +64,8 @@ async function materialise(fixture) {
   const git = (args) => run('git', args, { cwd: repo });
 
   await git(['init', '-q']);
-  await git(['config', 'user.email', 'eval@crosscheck.invalid']);
-  await git(['config', 'user.name', 'Crosscheck Eval']);
+  await git(['config', 'user.email', 'eval@verik.invalid']);
+  await git(['config', 'user.name', 'Verik Eval']);
 
   const before = join(fixture.dir, 'before');
   if (await exists(before)) await cp(before, repo, { recursive: true });

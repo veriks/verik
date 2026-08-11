@@ -1,7 +1,7 @@
 # datasets/evaluation/
 
 End-to-end evaluation fixtures: complete synthetic repository changes with
-expected Crosscheck verdicts.
+expected Verik verdicts.
 
 Used to:
 - Measure pipeline accuracy across model versions
@@ -67,7 +67,7 @@ changes get tuned toward a fantasy.
 
 Fixtures should be derived from real runs:
 
-1. Run Crosscheck against real agent-generated diffs with a real key.
+1. Run Verik against real agent-generated diffs with a real key.
 2. Read every finding and label it true or false positive yourself.
 3. Turn the labelled cases — especially the ones it got *wrong* — into fixtures.
 

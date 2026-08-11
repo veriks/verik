@@ -6,7 +6,7 @@ import { block, bold, brand, muted, pass, section, severityTint, subtle } from '
 import { checklist } from '../output/prompt.js';
 
 /**
- * `crosscheck policy` — how strict this repository is.
+ * `verik policy` — how strict this repository is.
  *
  * The file stays the source of truth. This command exists so nobody has to
  * hand-edit JSON and so an invalid value fails here, with a sentence, rather
@@ -70,9 +70,9 @@ export function buildPolicyCommand(): Command {
           ]).join('\n'),
         );
         console.log(
-          `\n    ${brand('crosscheck policy mode <mode>')}${muted(`   ${MODES.join(' · ')}`)}`,
+          `\n    ${brand('verik policy mode <mode>')}${muted(`   ${MODES.join(' · ')}`)}`,
         );
-        console.log(`    ${brand('crosscheck rules')}${muted('   per-rule tuning')}\n`);
+        console.log(`    ${brand('verik rules')}${muted('   per-rule tuning')}\n`);
       } catch (err) {
         console.error(`${block('✕')} ${formatError(err)}`);
         process.exit(1);
@@ -124,7 +124,7 @@ export function buildPolicyCommand(): Command {
         );
         if (policy.mode !== 'blocking') {
           console.log(
-            `  ${subtle(`policy mode is ${policy.mode}, so nothing blocks yet — crosscheck policy mode blocking`)}`,
+            `  ${subtle(`policy mode is ${policy.mode}, so nothing blocks yet — verik policy mode blocking`)}`,
           );
         }
         console.log();

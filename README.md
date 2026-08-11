@@ -1,12 +1,12 @@
-# Crosscheck
+# Verik
 
-Crosscheck is an independent verification runtime for AI-generated code.
+Verik is an independent verification runtime for AI-generated code.
 
-> **Unlike traditional AI code review, Crosscheck separates generation from verification. The system that writes code is never the same system that decides whether it should be trusted..**
+> **Unlike traditional AI code review, Verik separates generation from verification. The system that writes code is never the same system that decides whether it should be trusted..**
 
 ## How it works
 
-Crosscheck wraps any coding agent or development command, captures the repository diff it produced, then independently verifies those changes through four isolated stages:
+Verik wraps any coding agent or development command, captures the repository diff it produced, then independently verifies those changes through four isolated stages:
 
 ```
 Wrapped command
@@ -31,11 +31,11 @@ Terminal + report
 **Not yet published to npm.** Build from source — this takes about a minute:
 
 ```sh
-git clone https://github.com/crosscheck-sh/crosscheck.git
-cd crosscheck && pnpm install && pnpm build && npm link
+git clone https://github.com/verik-sh/verik.git
+cd verik && pnpm install && pnpm build && npm link
 ```
 
-Then `crosscheck --version` should print `0.1.0`.
+Then `verik --version` should print `0.1.0`.
 
 Full walkthrough on a real repository: **[docs/quickstart.md](docs/quickstart.md)**
 
@@ -43,29 +43,29 @@ Full walkthrough on a real repository: **[docs/quickstart.md](docs/quickstart.md
 
 ```sh
 # 1. Initialize — `rules` mode needs no API key, no network
-crosscheck init --yes --mode rules
+verik init --yes --mode rules
 
 # 2. Wrap a coding agent or any command
-crosscheck run -- claude -p "Add OAuth login"
-crosscheck run -- codex
-crosscheck run -- aider
-crosscheck run -- amp
-crosscheck verify
+verik run -- claude -p "Add OAuth login"
+verik run -- codex
+verik run -- aider
+verik run -- amp
+verik verify
 
 # 3. Check the verdict
-crosscheck report
-crosscheck explain
+verik report
+verik explain
 ```
 
 Or stop having to remember it — verify on every commit:
 
 ```sh
-crosscheck hook install
+verik hook install
 ```
 
 Runs the deterministic rules (no API key, no network) before each `git commit`,
 and blocks only when your policy says to. An existing hook — husky, lint-staged,
-pre-commit — is preserved and still runs; `crosscheck hook uninstall` puts it
+pre-commit — is preserved and still runs; `verik hook uninstall` puts it
 back exactly as it was. A single commit can always skip it with
 `git commit --no-verify`.
 
@@ -77,32 +77,32 @@ Step-by-step walkthrough, no API key needed: **[docs/quickstart.md](docs/quickst
 
 | Command | Description |
 |---------|-------------|
-| `crosscheck init` | Create `.crosscheck/` with config and policy files |
-| `crosscheck run -- <cmd>` | Wrap and verify a command |
-| `crosscheck verify` | Verify the current uncommitted diff (no command) |
-| `crosscheck begin` | Mark a baseline, for agents that can't be wrapped |
-| `crosscheck hook install` | Verify on every `git commit` |
-| `crosscheck rules` | List and tune the deterministic rules |
-| `crosscheck policy` | Show or change how strict verification is |
-| `crosscheck report [run-id]` | Print the latest (or specific) report |
-| `crosscheck explain [run-id]` | Explain the latest verdict in plain English |
-| `crosscheck status` | Show repository and Crosscheck status |
-| `crosscheck config` | Show the current configuration |
+| `verik init` | Create `.verik/` with config and policy files |
+| `verik run -- <cmd>` | Wrap and verify a command |
+| `verik verify` | Verify the current uncommitted diff (no command) |
+| `verik begin` | Mark a baseline, for agents that can't be wrapped |
+| `verik hook install` | Verify on every `git commit` |
+| `verik rules` | List and tune the deterministic rules |
+| `verik policy` | Show or change how strict verification is |
+| `verik report [run-id]` | Print the latest (or specific) report |
+| `verik explain [run-id]` | Explain the latest verdict in plain English |
+| `verik status` | Show repository and Verik status |
+| `verik config` | Show the current configuration |
 
 ## Tuning
 
 A rule too noisy for your codebase has two levers, and they are not equivalent:
 
 ```sh
-crosscheck rules                                  # see all 23 and their severity
-crosscheck rules severity debug-artifact info     # keep it, stop it blocking
-crosscheck rules disable type-escape --reason "generated protobuf bindings"
-crosscheck policy mode advisory                   # report everything, block nothing
+verik rules                                  # see all 23 and their severity
+verik rules severity debug-artifact info     # keep it, stop it blocking
+verik rules disable type-escape --reason "generated protobuf bindings"
+verik policy mode advisory                   # report everything, block nothing
 ```
 
 Reach for `severity` first — the finding stays in the report, it just stops
 crossing the blocking threshold, so no information is lost. `disable` requires a
-written reason, which is stored in `.crosscheck/policy.json` and therefore shows
+written reason, which is stored in `.verik/policy.json` and therefore shows
 up in the pull request that turned the rule off.
 
 Even a disabled rule still runs. Its findings are recorded in the run record as
@@ -111,7 +111,7 @@ can never hide something without leaving a trace.
 
 ## Configuration
 
-`crosscheck init` creates `.crosscheck/config.json`:
+`verik init` creates `.verik/config.json`:
 
 ```json
 {
@@ -129,14 +129,14 @@ can never hide something without leaving a trace.
 export ANTHROPIC_API_KEY=...
 
 # Optional — override the per-stage defaults shown here.
-export CROSSCHECK_MODEL_SCOUT=claude-haiku-4-5
-export CROSSCHECK_MODEL_REVIEWER=claude-sonnet-5
-export CROSSCHECK_MODEL_JUDGE=claude-opus-5
+export VERIK_MODEL_SCOUT=claude-haiku-4-5
+export VERIK_MODEL_REVIEWER=claude-sonnet-5
+export VERIK_MODEL_JUDGE=claude-opus-5
 ```
 
 ## Policy
 
-`.crosscheck/policy.json` controls how verdicts affect the exit code:
+`.verik/policy.json` controls how verdicts affect the exit code:
 
 | Mode | Behavior |
 |------|----------|
@@ -149,7 +149,7 @@ export CROSSCHECK_MODEL_JUDGE=claude-opus-5
 | Code | Meaning |
 |------|---------|
 | `0` | Passed, or the policy chose not to block |
-| `1` | Crosscheck itself failed |
+| `1` | Verik itself failed |
 | `2` | **Policy blocked** — do not ship |
 | `3` | Blocking mode, but verification never reached a verdict |
 | other | The wrapped command's own exit code, passed through |
@@ -166,7 +166,7 @@ export CROSSCHECK_MODEL_JUDGE=claude-opus-5
 
 ## Reports
 
-Every run stores under `.crosscheck/runs/<run-id>/`:
+Every run stores under `.verik/runs/<run-id>/`:
 
 - `metadata.json` — run record
 - `diff.patch` — the diff produced by the wrapped command
@@ -192,13 +192,13 @@ pnpm build
 
 ## Principles
 
-Crosscheck follows a few non-negotiable rules.
+Verik follows a few non-negotiable rules.
 
 - The verifier is independent from the generator.
 - Every finding references evidence.
 - AI recommendations never execute shell commands.
 - Deterministic evidence always takes precedence over model opinion.
-- Crosscheck never mutates your repository during verification.
+- Verik never mutates your repository during verification.
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Something in Crosscheck isn't working as expected
+about: Something in Verik isn't working as expected
 title: "[Bug] "
 labels: bug
 assignees: ''
@@ -22,14 +22,14 @@ assignees: ''
 
 ## Environment
 
-- Crosscheck version: `crosscheck --version`
+- Verik version: `verik --version`
 - OS:
 - Node version:
 - Install method: npm / curl / binary
 
 ## Relevant output
 
-<!-- Paste terminal output, and if applicable the run report from .crosscheck/runs/<run-id>/ -->
+<!-- Paste terminal output, and if applicable the run report from .verik/runs/<run-id>/ -->
 
 ```
 paste here

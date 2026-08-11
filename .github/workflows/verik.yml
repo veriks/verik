@@ -1,13 +1,13 @@
-name: Crosscheck
+name: Verik
 
-# Crosscheck verifying its own pull requests.
+# Verik verifying its own pull requests.
 #
 # This builds from the checkout rather than installing from npm. Installing the
 # published package would verify each PR using the *last released* version, so
 # the change under review would never be the thing doing the reviewing — and a
-# PR that breaks Crosscheck would be reviewed by the old, working Crosscheck.
+# PR that breaks Verik would be reviewed by the old, working Verik.
 #
-# Users integrating Crosscheck into their own repository should install from npm
+# Users integrating Verik into their own repository should install from npm
 # instead — see docs/ci.md for that version.
 
 on:
@@ -15,7 +15,7 @@ on:
     branches: [main, master]
 
 jobs:
-  crosscheck:
+  verik:
     runs-on: ubuntu-latest
     name: Verify AI changes
 
@@ -36,10 +36,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build Crosscheck from this PR
+      - name: Build Verik from this PR
         run: pnpm build
 
-      # No `crosscheck init` here. It writes .crosscheck/ into the working tree,
+      # No `verik init` here. It writes .verik/ into the working tree,
       # which would then be the only thing an uncommitted-changes verify could see.
       # Config and policy are read from the repo if committed, else defaults apply.
 
@@ -54,7 +54,7 @@ jobs:
         # Exit codes: 0 pass/advisory · 2 policy block · 3 inconclusive
         run: |
           if [ -z "$ANTHROPIC_API_KEY" ]; then
-            echo "::notice title=Crosscheck skipped::ANTHROPIC_API_KEY is not set. Add it as a repository secret to enable self-verification."
+            echo "::notice title=Verik skipped::ANTHROPIC_API_KEY is not set. Add it as a repository secret to enable self-verification."
             exit 0
           fi
           node dist/index.js verify \

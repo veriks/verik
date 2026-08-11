@@ -61,12 +61,12 @@ jobs:
 
             **npm (recommended)**
             ```sh
-            npm install -g crosscheck
+            npm install -g verik
             ```
 
             **curl (macOS / Linux)**
             ```sh
-            curl -fsSL https://raw.githubusercontent.com/crosscheck-sh/crosscheck/main/scripts/install.sh | sh
+            curl -fsSL https://raw.githubusercontent.com/verik-sh/verik/main/scripts/install.sh | sh
             ```
 
             **Direct download**

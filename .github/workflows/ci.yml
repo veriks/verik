@@ -42,8 +42,8 @@ jobs:
       # Integration tests build real git repositories in temp directories.
       - name: Configure git identity
         run: |
-          git config --global user.email "ci@crosscheck.invalid"
-          git config --global user.name "Crosscheck CI"
+          git config --global user.email "ci@verik.invalid"
+          git config --global user.name "Verik CI"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
