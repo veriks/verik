@@ -112,9 +112,9 @@ export function buildDryRunCommand(): Command {
         // Models
         console.log(bold('Models'));
         const spec = PROVIDERS[config.provider];
-        const keyVar = spec?.apiKeyEnv ?? 'ANTHROPIC_API_KEY';
-        const apiKey = spec ? resolveApiKey(spec) : undefined;
-        if (!apiKey && !spec?.keyOptional) {
+        const keyVar = spec.apiKeyEnv;
+        const apiKey = resolveApiKey(spec);
+        if (!apiKey && !spec.keyOptional) {
           console.log(`  ${block('✗')} ${keyVar} not set — LLM stages would be skipped`);
         } else {
           console.log(`  Scout:    ${config.models.scout}`);

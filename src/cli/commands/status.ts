@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { getRepositoryInfo } from '../../core/repository/git-repository.js';
 import { listRunIds } from '../../storage/local-run-store.js';
+import { PROVIDERS, resolveApiKey } from '../../inference/providers.js';
 import { loadConfig, loadPolicy } from '../../config/config-loader.js';
 import { block, kv, mark, pass, section, subtle, warn } from '../output/theme.js';
 
@@ -13,7 +14,10 @@ export function buildStatusCommand(): Command {
         const config = await loadConfig(info.root);
         const policy = await loadPolicy(info.root);
         const runs = await listRunIds(info.root);
-        const hasKey = Boolean(process.env['ANTHROPIC_API_KEY']);
+        // Which key matters depends on the provider. Reading ANTHROPIC_API_KEY
+        // unconditionally reported "no key" to everyone not on Anthropic.
+        const spec = PROVIDERS[config.provider];
+        const hasKey = Boolean(spec && (resolveApiKey(spec) || spec.keyOptional));
 
         console.log(`\n${mark()}  ${section('repository')}`);
         console.log(kv('path', info.root));

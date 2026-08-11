@@ -106,20 +106,30 @@ export function buildDoctorCommand(): Command {
       const providerId = await loadConfig(repoRoot)
         .then((c) => c.provider)
         .catch(() => 'anthropic' as const);
-      const spec = PROVIDERS[providerId as ProviderId] as ProviderSpec | undefined;
-      const keyVar = spec?.apiKeyEnv ?? 'ANTHROPIC_API_KEY';
-      const apiKey = spec ? resolveApiKey(spec) : undefined;
+      // `provider` is enum-validated on load, so the spec always exists — no
+      // fallback, and therefore no place for an Anthropic assumption to hide.
+      const spec: ProviderSpec = PROVIDERS[providerId as ProviderId];
+      const keyVar = spec.apiKeyEnv;
+      const apiKey = resolveApiKey(spec);
       results.push(
         await check(`${keyVar} is set`, async () => {
-          if (apiKey || spec?.keyOptional) return 'ok';
+          if (apiKey || spec.keyOptional) return 'ok';
           return {
             fail: `Set ${keyVar} to enable AI verification stages (provider: ${providerId})`,
           };
         }),
       );
 
-      // 6. API key valid (only if present)
-      if (apiKey) {
+      // 6 and 7. Key and models, asked of the provider actually configured.
+      //
+      // These used to build an Anthropic client and request claude-haiku-4-5
+      // whatever the config said, so an OpenAI user with a perfectly good key
+      // saw "API key is invalid or expired — generate a new key at
+      // console.anthropic.com" and three rejected models. Diagnostics that
+      // confidently blame the wrong thing are worse than none.
+      const cfg = await loadConfig(repoRoot).catch(() => undefined);
+
+      if (apiKey && providerId === 'anthropic') {
         results.push(
           await check('API key is accepted by Anthropic', async () => {
             try {
@@ -143,43 +153,49 @@ export function buildDoctorCommand(): Command {
             }
           }),
         );
+      } else if (apiKey && spec.baseUrl) {
+        // Every other provider speaks OpenAI-compatible HTTP, where GET /models
+        // both proves the key and lists what it can reach — one free request
+        // instead of a billed completion per stage.
+        const base = cfg?.baseUrl ?? spec.baseUrl;
+        const available: string[] = [];
 
-        // 7. Model names resolve
-        let config;
-        try {
-          config = await loadConfig(repoRoot);
-        } catch {
-          /* already caught above */
-        }
-        if (config) {
-          const client = new Anthropic({ apiKey, maxRetries: 0 });
+        results.push(
+          await check(`API key is accepted by ${spec.label}`, async () => {
+            try {
+              const res = await fetch(`${base}/models`, {
+                headers: { Authorization: `Bearer ${apiKey}` },
+              });
+              if (res.status === 401 || res.status === 403) {
+                return { fail: `API key rejected — generate a new one at ${spec.docs}` };
+              }
+              if (!res.ok) return { warn: `${spec.label} returned HTTP ${res.status}` };
+              const body = (await res.json()) as { data?: Array<{ id?: string }> };
+              available.push(...(body.data ?? []).map((m) => m.id ?? '').filter(Boolean));
+              return 'ok';
+            } catch (e) {
+              return { warn: `Could not reach ${spec.label}: ${String(e)}` };
+            }
+          }),
+        );
+
+        // Absence is a warning, not a failure: plenty of gateways serve models
+        // they do not enumerate.
+        if (cfg && available.length > 0) {
+          const listed = available;
           for (const [stage, model] of [
-            ['scout', config.models.scout],
-            ['reviewer', config.models.reviewer],
-            ['judge', config.models.judge],
+            ['scout', cfg.models.scout],
+            ['reviewer', cfg.models.reviewer],
+            ['judge', cfg.models.judge],
           ] as [string, string][]) {
-            if (model === 'configured-through-environment') continue;
             results.push(
-              await check(`Model for ${stage} (${model}) is accessible`, async () => {
-                try {
-                  await client.messages.create({
-                    model,
-                    max_tokens: 1,
-                    messages: [{ role: 'user', content: 'ping' }],
-                  });
-                  return 'ok';
-                } catch (e) {
-                  if (e instanceof Anthropic.NotFoundError) {
-                    return {
-                      fail: `Model "${model}" not found — check VERIK_MODEL_${stage.toUpperCase()} or config.json`,
-                    };
-                  }
-                  if (e instanceof Anthropic.AuthenticationError) {
-                    return { fail: 'API key rejected' };
-                  }
-                  return { warn: `Could not verify model: ${String(e)}` };
-                }
-              }),
+              await check(`Model for ${stage} (${model}) is listed`, async () =>
+                listed.includes(model)
+                  ? 'ok'
+                  : {
+                      warn: `"${model}" is not in ${spec.label}'s model list — it may still work, or set VERIK_MODEL_${stage.toUpperCase()}`,
+                    },
+              ),
             );
           }
         }

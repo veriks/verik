@@ -1,4 +1,5 @@
-import { VerikConfigSchema, PolicyConfigSchema } from './config-schema.js';
+import { VerikConfigSchema, PolicyConfigSchema, ModelsConfigSchema } from './config-schema.js';
+import { PROVIDERS } from '../inference/providers.js';
 import type { VerikConfig, PolicyConfig } from './config-schema.js';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -6,6 +7,12 @@ import { ConfigError } from '../shared/errors.js';
 import { validateBuilderCommands } from '../stages/builder/command-allowlist.js';
 
 export const VERIK_DIR = '.verik';
+
+/** A provider's own default models, falling back to the schema's. */
+function modelsForProvider(provider: string): VerikConfig['models'] {
+  const spec = (PROVIDERS as Record<string, { defaultModels?: VerikConfig['models'] }>)[provider];
+  return spec?.defaultModels ? { ...spec.defaultModels } : ModelsConfigSchema.parse({});
+}
 
 export async function loadConfig(repoRoot: string): Promise<VerikConfig> {
   const configPath = join(repoRoot, VERIK_DIR, 'config.json');
@@ -16,7 +23,17 @@ export async function loadConfig(repoRoot: string): Promise<VerikConfig> {
     if (!result.success) {
       throw new ConfigError(`Invalid config: ${result.error.message}`);
     }
-    const config = applyEnvironmentOverrides(result.data);
+    // The schema's model defaults are Anthropic ids, and zod cannot know the
+    // provider. A config naming a different provider without a `models` block
+    // therefore came back asking that provider for claude-opus-5. Checking the
+    // raw JSON distinguishes "absent" from "deliberately set to a Claude id".
+    const rawHasModels =
+      typeof parsed === 'object' && parsed !== null && 'models' in (parsed as object);
+    const withModels = rawHasModels
+      ? result.data
+      : { ...result.data, models: modelsForProvider(result.data.provider) };
+
+    const config = applyEnvironmentOverrides(withModels);
     // Validate extra builder commands against the allowlist.
     // This runs at load time so `verik run` fails fast with a clear message
     // rather than executing a malicious command string mid-verification.
@@ -26,7 +43,8 @@ export async function loadConfig(repoRoot: string): Promise<VerikConfig> {
     return config;
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      return applyEnvironmentOverrides(VerikConfigSchema.parse({ version: 1 }));
+      const base = VerikConfigSchema.parse({ version: 1 });
+      return applyEnvironmentOverrides({ ...base, models: modelsForProvider(base.provider) });
     }
     if (err instanceof ConfigError) throw err;
     throw new ConfigError(`Failed to read config: ${String(err)}`);

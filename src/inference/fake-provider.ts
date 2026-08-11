@@ -1,4 +1,8 @@
-import type { LlmProvider, StructuredGenerationRequest, StructuredGenerationResult } from './llm-provider.js';
+import type {
+  LlmProvider,
+  StructuredGenerationRequest,
+  StructuredGenerationResult,
+} from './llm-provider.js';
 import { ProviderError } from '../shared/errors.js';
 
 export class FakeProvider implements LlmProvider {
@@ -6,7 +10,8 @@ export class FakeProvider implements LlmProvider {
     request: StructuredGenerationRequest<T>,
   ): Promise<StructuredGenerationResult<T>> {
     throw new ProviderError(
-      `No real provider configured. Stage: ${request.stage}. Set ANTHROPIC_API_KEY and configure a model.`,
+      `No provider configured for stage ${request.stage}. Set the API key for your ` +
+        `configured provider — run \`verik doctor\` to see which variable that is.`,
     );
   }
 }
