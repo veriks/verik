@@ -128,6 +128,83 @@ RULES
 
 The tests passed. That is the point.
 
+## Making it block
+
+**Nothing blocks by default.** Out of the box the policy is `advisory`: Verik
+reports everything and always exits 0. If you expected it to stop something and
+it did not, this is why.
+
+There are two gates and they stop different things.
+
+### Local — stops the commit
+
+```sh
+verik policy mode blocking     # findings at high+ now exit 2
+verik hook install             # run the rules before every commit
+```
+
+Now `git commit` fails when a finding meets the threshold. Fast feedback while
+you work — but `git commit --no-verify` skips it, and a pre-commit hook cannot
+stop a `git push`. Treat this as a convenience, not enforcement.
+
+### CI — stops the merge
+
+This is the gate that actually holds, because nobody can bypass it.
+
+```yaml
+- name: Verify
+  env:
+    OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}   # only for `full` mode
+    BASE_REF: ${{ github.event.pull_request.base.ref }}
+  run: verik verify --base "origin/$BASE_REF"
+```
+
+Exit 2 fails the job. Then make it required:
+
+**Settings → Branches → Add rule → Require status checks to pass**, and select
+that job.
+
+A pull request with a blocking finding can no longer be merged, whatever the
+author has configured locally.
+
+See [docs/ci.md](docs/ci.md) for the full workflow, including why the PR title
+must be passed through `env:` rather than interpolated into `run:`.
+
+### Three modes
+
+| Mode | Effect |
+|------|--------|
+| `shadow` | Records a verdict, never changes the exit code |
+| `advisory` | Reports findings, always exits 0 — the default |
+| `blocking` | Exits 2 when a finding meets the threshold |
+
+```sh
+verik policy                      # what is in force right now
+verik policy mode blocking
+verik policy block-at critical    # raise the bar
+```
+
+`rules` mode blocks on deterministic findings alone, so this works with no API
+key and no network.
+
+## Day to day
+
+```sh
+verik begin                       # before the agent starts
+# ...let it work...
+verik verify                      # what did it change, and is it safe
+verik explain                     # the verdict in plain English
+```
+
+Or wrap it directly and skip `begin`:
+
+```sh
+verik run -- claude -p "add rate limiting"
+verik run -- codex exec "fix the failing test"
+```
+
+Or install the hook once and stop thinking about it.
+
 ## Architecture
 
 **Attribution engine.** Builds real git tree objects through a scratch index and

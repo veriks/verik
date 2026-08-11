@@ -4,7 +4,10 @@ Verik works in any CI environment that supports Node.js 20+.
 
 ## GitHub Actions
 
-Add `ANTHROPIC_API_KEY` as a repository secret, then add a workflow:
+Add your provider's key as a repository secret — `OPENAI_API_KEY`,
+`ANTHROPIC_API_KEY`, whichever `verik doctor` names. `rules` mode needs none.
+
+Then add a workflow:
 
 ```yaml
 name: Verik
@@ -24,11 +27,12 @@ jobs:
         with:
           node-version: '20'
 
-      - run: npm install -g verik
+      # Not published to npm yet, so build from source.
+      - run: npm install -g pnpm && pnpm install --frozen-lockfile && pnpm build && npm link
 
       - name: Verify changes
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           # Passed through the environment, never interpolated into the shell.
           # A pull request title is attacker-controlled text; writing
           # ${{ github.event.pull_request.title }} inside `run:` substitutes it
