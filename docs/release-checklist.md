@@ -7,43 +7,28 @@ project, and the first section exists because of it.
 
 ---
 
-## 1. Before anything else: one blocker
+## 1. Tagging is safe now
 
-**`release.yml` publishes any `v*` tag straight to `latest`.**
+`release.yml` used to publish any `v*` tag straight to `latest`, so tagging a
+prerelease to rehearse a release would have shipped it to everyone — and npm
+versions are immutable, so the version string was spent either way.
 
-Tag `v0.1.0-alpha.0` meaning "prerelease" and it ships as the real thing, over
-the placeholder, permanently — npm versions are immutable. Fix this before you
-type your first `git tag`.
+Fixed. The workflow now reads the tag and picks the channel:
 
-The workflow needs to read the tag, and pass `--tag` accordingly:
+| Tag | npm dist-tag | GitHub release |
+|-----|--------------|----------------|
+| `v0.1.0` | `latest` | normal |
+| `v0.1.0-alpha.0` | `alpha` | marked prerelease |
+| `v0.2.0-beta.3` | `beta` | marked prerelease |
+| `v1.0.0-rc.1` | `rc` | marked prerelease |
 
-```yaml
-- name: Resolve npm dist-tag
-  id: disttag
-  env:
-    TAG: ${{ github.ref_name }}
-  run: |
-    version="${TAG#v}"
-    if [ "$version" = "${version#*-}" ]; then
-      echo "tag=latest"       >> "$GITHUB_OUTPUT"
-      echo "prerelease=false" >> "$GITHUB_OUTPUT"
-    else
-      channel="${version#*-}"; channel="${channel%%.*}"
-      echo "tag=${channel}"   >> "$GITHUB_OUTPUT"
-      echo "prerelease=true"  >> "$GITHUB_OUTPUT"
-    fi
+A hyphen in the version means prerelease, which is plain semver. Prereleases
+never touch `latest`, so `npm install -g verik` keeps resolving to the last real
+release and testers opt in with `npm install -g verik@alpha`.
 
-- name: Publish to npm
-  env:
-    NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-    DIST_TAG: ${{ steps.disttag.outputs.tag }}
-  run: npm publish --provenance --access public --tag "$DIST_TAG"
-```
-
-Also confirm the tag in `package.json` matches the git tag. A mismatch publishes
-a version nobody asked for.
-
----
+The workflow also refuses to run when the tag disagrees with `package.json`,
+which otherwise publishes a version nobody asked for under a name that says
+something else.
 
 ## 2. Platform testing
 
