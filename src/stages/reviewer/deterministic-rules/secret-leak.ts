@@ -25,10 +25,10 @@ const SECRET_PATTERNS = [
   },
 ] as const;
 
-export class SecretLeakRule implements DeterministicRule {
-  id = 'secret-leak';
-  title = 'Likely secret added to diff';
-  defaultSeverity = 'critical' as const;
+export const SecretLeakRule: DeterministicRule = {
+  id: 'secret-leak',
+  title: 'Likely secret added to diff',
+  defaultSeverity: 'critical',
 
   async run(ctx: RuleContext): Promise<DeterministicFinding[]> {
     const findings: DeterministicFinding[] = [];
@@ -62,8 +62,8 @@ export class SecretLeakRule implements DeterministicRule {
     }
 
     return findings;
-  }
-}
+  },
+};
 
 function redactMatch(text: string, value: string): string {
   const safe = value ? text.split(value).join('[REDACTED]') : text;

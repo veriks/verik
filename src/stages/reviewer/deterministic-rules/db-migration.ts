@@ -1,9 +1,9 @@
 import type { DeterministicRule, DeterministicFinding, RuleContext } from './index.js';
 
-export class DbMigrationRule implements DeterministicRule {
-  id = 'db-migration';
-  title = 'Database migration added';
-  defaultSeverity = 'medium' as const;
+export const DbMigrationRule: DeterministicRule = {
+  id: 'db-migration',
+  title: 'Database migration added',
+  defaultSeverity: 'medium',
 
   async run(ctx: RuleContext): Promise<DeterministicFinding[]> {
     const migrations = ctx.diff.changedFiles.filter(
@@ -21,5 +21,5 @@ export class DbMigrationRule implements DeterministicRule {
       excerpt: f.path,
       remediation: 'Verify migration is backward-compatible and tested.',
     }));
-  }
-}
+  },
+};

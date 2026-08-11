@@ -1,7 +1,6 @@
-import { block } from '../output/theme.js';
+import { block, bold, muted as dim, pass as green, warn as yellow } from '../output/theme.js';
 import { formatError } from '../../shared/format-error.js';
 import { Command } from 'commander';
-import chalk from 'chalk';
 import { getRepositoryInfo } from '../../core/repository/git-repository.js';
 import { computeWorktreeDiff } from '../../core/repository/diff-capture.js';
 import { loadConfig, loadPolicy } from '../../config/config-loader.js';
@@ -10,13 +9,6 @@ import { selectContext } from '../../core/context/context-selector.js';
 import { detectProject } from '../../stages/builder/project-detector.js';
 import { planCommands } from '../../stages/builder/command-planner.js';
 import { getActiveOverrides } from '../../core/memory/memory-store.js';
-
-const c = () => process.stdout.isTTY && !process.env['NO_COLOR'];
-const dim = (s: string) => (c() ? chalk.dim(s) : s);
-const bold = (s: string) => (c() ? chalk.bold(s) : s);
-const green = (s: string) => (c() ? chalk.green(s) : s);
-const yellow = (s: string) => (c() ? chalk.yellow(s) : s);
-const red = (s: string) => (c() ? chalk.red(s) : s);
 
 export function buildDryRunCommand(): Command {
   return new Command('dry-run')
@@ -120,7 +112,7 @@ export function buildDryRunCommand(): Command {
         console.log(bold('Models'));
         const apiKey = process.env['ANTHROPIC_API_KEY'];
         if (!apiKey) {
-          console.log(`  ${red('✗')} ANTHROPIC_API_KEY not set — LLM stages would be skipped`);
+          console.log(`  ${block('✗')} ANTHROPIC_API_KEY not set — LLM stages would be skipped`);
         } else {
           console.log(`  Scout:    ${config.models.scout}`);
           console.log(`  Reviewer: ${config.models.reviewer}`);

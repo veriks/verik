@@ -1,9 +1,9 @@
 import type { DeterministicRule, DeterministicFinding, RuleContext } from './index.js';
 
-export class LockfileChangedRule implements DeterministicRule {
-  id = 'lockfile-changed';
-  title = 'Dependency lockfile changed';
-  defaultSeverity = 'info' as const;
+export const LockfileChangedRule: DeterministicRule = {
+  id: 'lockfile-changed',
+  title: 'Dependency lockfile changed',
+  defaultSeverity: 'info',
 
   async run(ctx: RuleContext): Promise<DeterministicFinding[]> {
     const lockfiles = ctx.diff.changedFiles.filter((f) =>
@@ -21,5 +21,5 @@ export class LockfileChangedRule implements DeterministicRule {
       excerpt: f.path,
       remediation: 'Review the dependency changes for supply-chain risks.',
     }));
-  }
-}
+  },
+};

@@ -1,10 +1,10 @@
 import type { DeterministicRule, DeterministicFinding, RuleContext } from './index.js';
 import { iterateAddedLines } from './patch-lines.js';
 
-export class EmptyCatchRule implements DeterministicRule {
-  id = 'empty-catch';
-  title = 'Empty catch block';
-  defaultSeverity = 'low' as const;
+export const EmptyCatchRule: DeterministicRule = {
+  id: 'empty-catch',
+  title: 'Empty catch block',
+  defaultSeverity: 'low',
 
   async run(ctx: RuleContext): Promise<DeterministicFinding[]> {
     const findings: DeterministicFinding[] = [];
@@ -34,5 +34,5 @@ export class EmptyCatchRule implements DeterministicRule {
       }
     }
     return findings;
-  }
-}
+  },
+};

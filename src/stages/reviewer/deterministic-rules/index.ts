@@ -85,8 +85,8 @@ export async function loadRules(): Promise<DeterministicRule[]> {
   return [
     // Leaked credentials first: the only finding class that stays dangerous
     // after the change is reverted.
-    new secret.SecretLeakRule(),
-    new env.EnvFileRule(),
+    secret.SecretLeakRule,
+    env.EnvFileRule,
 
     // Unsafe shortcuts.
     sec.InsecureTransportRule,
@@ -100,7 +100,7 @@ export async function loadRules(): Promise<DeterministicRule[]> {
     shortcuts.StubImplementationRule,
     shortcuts.SuppressionAddedRule,
     shortcuts.SwallowedErrorRule,
-    new emptyCatch.EmptyCatchRule(),
+    emptyCatch.EmptyCatchRule,
     shortcuts.TypeEscapeRule,
     shortcuts.DebugArtifactRule,
 
@@ -114,8 +114,8 @@ export async function loadRules(): Promise<DeterministicRule[]> {
     repo.RiskyDependencySourceRule,
 
     // Context worth surfacing, not problems in themselves.
-    new migration.DbMigrationRule(),
-    new lockfile.LockfileChangedRule(),
+    migration.DbMigrationRule,
+    lockfile.LockfileChangedRule,
   ];
 }
 

@@ -76,13 +76,13 @@ describe('SecretLeakRule', () => {
       '+const c = "sk-cccccccccccccccccccc";',
       '+const d = "sk-dddddddddddddddddddd";',
     ]);
-    const found = await new SecretLeakRule().run(ctx(patch));
+    const found = await SecretLeakRule.run(ctx(patch));
     expect(found).toHaveLength(4);
   });
 
   it('reports a real file and line', async () => {
     const patch = hunk('src/config.ts', 7, ['+const k = "sk-abcdefghijklmnop";']);
-    const [finding] = await new SecretLeakRule().run(ctx(patch));
+    const [finding] = await SecretLeakRule.run(ctx(patch));
     expect(finding!.file).toBe('src/config.ts');
     expect(finding!.line).toBe(7);
   });
@@ -90,7 +90,7 @@ describe('SecretLeakRule', () => {
   it('never echoes the secret into the excerpt', async () => {
     // The excerpt reaches reports and memory, and memory becomes team-shared.
     const patch = hunk('a.ts', 1, ['+const k = "sk-supersecretvalue123";']);
-    const [finding] = await new SecretLeakRule().run(ctx(patch));
+    const [finding] = await SecretLeakRule.run(ctx(patch));
     expect(finding!.excerpt).not.toContain('sk-supersecretvalue123');
     expect(finding!.excerpt).toContain('[REDACTED]');
   });
@@ -103,12 +103,12 @@ describe('SecretLeakRule', () => {
       '+const secret = "${VAULT_SECRET}";',
       '+const pw = "xxxxxxxxxxxx";',
     ]);
-    expect(await new SecretLeakRule().run(ctx(patch))).toHaveLength(0);
+    expect(await SecretLeakRule.run(ctx(patch))).toHaveLength(0);
   });
 
   it('still catches a real credential assignment', async () => {
     const patch = hunk('a.ts', 1, ['+const password = "hunter2-J8x!vQ2z";']);
-    expect(await new SecretLeakRule().run(ctx(patch))).toHaveLength(1);
+    expect(await SecretLeakRule.run(ctx(patch))).toHaveLength(1);
   });
 });
 
@@ -117,12 +117,12 @@ describe('EmptyCatchRule', () => {
     // Regression: added lines were flattened across the whole patch, so these
     // two unrelated files produced a finding.
     const patch = `${hunk('a.ts', 1, ['+try { x() } catch (e) {'])}\n${hunk('b.ts', 1, ['+}'])}`;
-    expect(await new EmptyCatchRule().run(ctx(patch))).toHaveLength(0);
+    expect(await EmptyCatchRule.run(ctx(patch))).toHaveLength(0);
   });
 
   it('still catches a genuinely empty catch', async () => {
     const patch = hunk('a.ts', 1, ['+  } catch (e) {', '+  }']);
-    const found = await new EmptyCatchRule().run(ctx(patch));
+    const found = await EmptyCatchRule.run(ctx(patch));
     expect(found).toHaveLength(1);
     expect(found[0]!.file).toBe('a.ts');
   });

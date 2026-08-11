@@ -1,9 +1,9 @@
 import type { DeterministicRule, DeterministicFinding, RuleContext } from './index.js';
 
-export class EnvFileRule implements DeterministicRule {
-  id = 'env-file-added';
-  title = '.env file introduced';
-  defaultSeverity = 'high' as const;
+export const EnvFileRule: DeterministicRule = {
+  id: 'env-file-added',
+  title: '.env file introduced',
+  defaultSeverity: 'high',
 
   async run(ctx: RuleContext): Promise<DeterministicFinding[]> {
     const envFiles = ctx.diff.changedFiles.filter(
@@ -19,5 +19,5 @@ export class EnvFileRule implements DeterministicRule {
       excerpt: f.path,
       remediation: 'Do not commit .env files. Add them to .gitignore.',
     }));
-  }
-}
+  },
+};
