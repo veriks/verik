@@ -39,7 +39,7 @@ anywhere you'd type `verik` below.
 
 ## 2. Set it up on your repo
 
-Go to a real project. A messy one with uncommitted work is *better* — that's the
+Go to a real project. A messy one with uncommitted work is _better_ — that's the
 case this tool exists for.
 
 ```sh
@@ -97,7 +97,7 @@ verik verify
 ```
 
 `begin` records where you were. `verify` compares against that point, not against
-your last commit — which is what lets it ignore the work *you'd* already done.
+your last commit — which is what lets it ignore the work _you'd_ already done.
 
 ### What you'll see
 
@@ -185,7 +185,7 @@ verik rules disable type-escape --reason "generated protobuf bindings"
 which is committed — so turning a check off shows up in your next pull request
 instead of quietly happening.
 
-Even disabled, the rule still runs and its findings are recorded as *suppressed*
+Even disabled, the rule still runs and its findings are recorded as _suppressed_
 in the run record. Switching something off never hides it without a trace.
 
 To silence one specific finding rather than a whole rule:
@@ -219,12 +219,12 @@ verik verify --base origin/main
 
 Exit codes:
 
-| Code | Meaning |
-|---|---|
-| `0` | Passed, or the policy chose not to block |
-| `1` | Verik itself failed |
-| `2` | **Policy blocked** — do not ship |
-| `3` | Blocking mode, but verification couldn't reach a verdict |
+| Code | Meaning                                                  |
+| ---- | -------------------------------------------------------- |
+| `0`  | Passed, or the policy chose not to block                 |
+| `1`  | Verik itself failed                                      |
+| `2`  | **Policy blocked** — do not ship                         |
+| `3`  | Blocking mode, but verification couldn't reach a verdict |
 
 See [ci.md](ci.md) for a full GitHub Actions example.
 
@@ -251,7 +251,7 @@ The single most useful thing you can tell us:
 
 The rules have only ever been tuned against one codebase. On a large, old, messy
 project the false-positive rate is genuinely unknown — and that number decides
-whether this is useful or annoying. A noisy result is a *useful* result; please
+whether this is useful or annoying. A noisy result is a _useful_ result; please
 send it.
 
 Also worth reporting:

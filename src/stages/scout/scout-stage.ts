@@ -11,7 +11,10 @@ export interface ScoutInput {
 export class ScoutStage implements VerificationStage<ScoutInput, ScoutOutput> {
   name = 'Scout';
 
-  async execute(input: ScoutInput, _context: RunContext): Promise<StageOutputWithMeta<ScoutOutput>> {
+  async execute(
+    input: ScoutInput,
+    _context: RunContext,
+  ): Promise<StageOutputWithMeta<ScoutOutput>> {
     const { context } = input;
     const { diff } = context;
 

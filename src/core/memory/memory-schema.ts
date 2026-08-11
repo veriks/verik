@@ -11,7 +11,7 @@ export const StoredFindingSchema = z.object({
   timestamp: z.string(),
 
   // Finding content
-  ruleId: z.string().optional(),          // deterministic rule ID if applicable
+  ruleId: z.string().optional(), // deterministic rule ID if applicable
   title: z.string(),
   category: z.string(),
   severity: SeveritySchema,
@@ -41,10 +41,10 @@ export const OverrideSchema = z.object({
   // What this override suppresses
   ruleId: z.string().optional(),
   filePath: z.string().optional(),
-  titlePattern: z.string().optional(),  // regex match against finding title
+  titlePattern: z.string().optional(), // regex match against finding title
 
   reason: z.string(),
-  expiresAt: z.string().optional(),     // ISO date — overrides can expire
+  expiresAt: z.string().optional(), // ISO date — overrides can expire
   createdBy: z.string().optional(),
 });
 

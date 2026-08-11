@@ -1,8 +1,16 @@
 import { z } from 'zod';
 
 export const ChangeTypeSchema = z.enum([
-  'feature', 'bugfix', 'refactor', 'test', 'documentation',
-  'dependency', 'configuration', 'migration', 'mixed', 'unknown',
+  'feature',
+  'bugfix',
+  'refactor',
+  'test',
+  'documentation',
+  'dependency',
+  'configuration',
+  'migration',
+  'mixed',
+  'unknown',
 ]);
 
 export const RiskLevelSchema = z.enum(['low', 'medium', 'high', 'critical']);

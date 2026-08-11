@@ -2,10 +2,20 @@ import { z } from 'zod';
 import { SeveritySchema } from '../../shared/schemas.js';
 
 export const FindingCategorySchema = z.enum([
-  'correctness', 'security', 'authorization', 'authentication',
-  'data-integrity', 'reliability', 'concurrency', 'performance',
-  'compatibility', 'testing', 'maintainability', 'dependency',
-  'configuration', 'privacy',
+  'correctness',
+  'security',
+  'authorization',
+  'authentication',
+  'data-integrity',
+  'reliability',
+  'concurrency',
+  'performance',
+  'compatibility',
+  'testing',
+  'maintainability',
+  'dependency',
+  'configuration',
+  'privacy',
 ]);
 
 export const EvidenceItemSchema = z.object({

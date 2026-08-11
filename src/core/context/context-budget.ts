@@ -11,7 +11,10 @@ export function createBudget(maxTokens: number): ContextBudget {
   return { totalTokens: maxTokens, usedTokens: 0, remainingTokens: maxTokens, truncated: false };
 }
 
-export function consumeBudget(budget: ContextBudget, text: string): { text: string; budget: ContextBudget } {
+export function consumeBudget(
+  budget: ContextBudget,
+  text: string,
+): { text: string; budget: ContextBudget } {
   const tokens = estimateTokens(text);
   if (tokens <= budget.remainingTokens) {
     return {

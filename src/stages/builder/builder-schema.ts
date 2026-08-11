@@ -1,7 +1,12 @@
 import { z } from 'zod';
 
 export const BuilderCommandStatusSchema = z.enum([
-  'passed', 'failed', 'skipped', 'timed_out', 'unavailable', 'errored',
+  'passed',
+  'failed',
+  'skipped',
+  'timed_out',
+  'unavailable',
+  'errored',
 ]);
 
 export const BuilderCommandResultSchema = z.object({

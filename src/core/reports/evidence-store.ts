@@ -3,11 +3,7 @@ import { customAlphabet } from 'nanoid';
 const generateEvidenceId = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
 
 export type EvidenceKind =
-  | 'diff-excerpt'
-  | 'builder-command'
-  | 'deterministic-rule'
-  | 'file-content'
-  | 'log-excerpt';
+  'diff-excerpt' | 'builder-command' | 'deterministic-rule' | 'file-content' | 'log-excerpt';
 
 export interface Evidence {
   id: string;

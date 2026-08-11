@@ -60,14 +60,14 @@ last published release.
 
 ## Exit codes
 
-| Code | Meaning | Default behaviour |
-|------|---------|-------------------|
-| 0 | Pass / advisory mode | CI passes |
-| 1 | Internal error | CI fails |
-| 2 | Policy block | CI fails (blocking mode only) |
-| 3 | Inconclusive | CI passes (configure as needed) |
-| 4 | Invalid configuration | CI fails |
-| 5 | Command could not start | CI fails |
+| Code | Meaning                 | Default behaviour               |
+| ---- | ----------------------- | ------------------------------- |
+| 0    | Pass / advisory mode    | CI passes                       |
+| 1    | Internal error          | CI fails                        |
+| 2    | Policy block            | CI fails (blocking mode only)   |
+| 3    | Inconclusive            | CI passes (configure as needed) |
+| 4    | Invalid configuration   | CI fails                        |
+| 5    | Command could not start | CI fails                        |
 
 By default, policy mode is `advisory` — Verik reports findings but never returns exit code 2. Switch to `blocking` in `.verik/policy.json` to fail CI on high-severity findings:
 

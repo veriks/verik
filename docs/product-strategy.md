@@ -20,10 +20,10 @@ entered from the bottom.
 
 The distinction matters because **the user and the buyer are different people**:
 
-| | Who | What they want |
-|---|---|---|
-| **User** | The individual developer | Fast, accurate, doesn't nag, doesn't get in the way |
-| **Buyer** | Eng manager, platform or security lead | Control, enforcement, evidence, auditability |
+|           | Who                                    | What they want                                      |
+| --------- | -------------------------------------- | --------------------------------------------------- |
+| **User**  | The individual developer               | Fast, accurate, doesn't nag, doesn't get in the way |
+| **Buyer** | Eng manager, platform or security lead | Control, enforcement, evidence, auditability        |
 
 Build for both. They are not the same product surface, and the buyer's features
 are worthless without the user's adoption first.
@@ -47,8 +47,8 @@ feeling like they are using a demo.
 
 ### Paid — anything that requires shared state
 
-The moment findings, memory, policy or overrides need to be shared *across
-people*, you need a backend — and that is a real product, not a paywall on
+The moment findings, memory, policy or overrides need to be shared _across
+people_, you need a backend — and that is a real product, not a paywall on
 something artificially removed:
 
 - **Shared memory** — "this file had a broken auth pattern three times before",
@@ -72,7 +72,7 @@ is the failure mode that kills most open-core products.
 ### Architectural implication
 
 **The memory engine is the seed of the commercial product.**
-`src/core/memory/` is local today. Making it team-shared *is* the paid product.
+`src/core/memory/` is local today. Making it team-shared _is_ the paid product.
 Keep that in mind when changing it — it is the highest-leverage code in the repo
 commercially, not just technically.
 
@@ -131,11 +131,11 @@ false positive on someone's real diff becomes the lasting impression.
 - **Apache-2.0 over MIT** — it explicitly reserves trademarks (MIT is silent) and
   carries a patent grant that enterprise legal teams look for.
 - **Trademark, not copyright, is the anti-clone protection.** Anyone can fork the
-  code under any permissive licence; what stops them shipping *Verik* is
+  code under any permissive licence; what stops them shipping _Verik_ is
   owning the mark. Worth registering early — but note "verik" is a common
   English word and will be harder to defend than an invented one. Lawyer
   territory.
-- **Not BUSL/Elastic-style, yet.** Those are what companies adopt *after* they
+- **Not BUSL/Elastic-style, yet.** Those are what companies adopt _after_ they
   are big enough for a competitor to resell them. Pre-launch it buys protection
   against a threat you do not have and costs the adoption you critically do.
 - **Private → public is reversible; public → private is not.** Holding the option
@@ -172,7 +172,7 @@ repository. Every test uses `FakeProvider`, which throws.
 
 Bottom-up adoption raises the bar here rather than lowering it: there is no
 salesperson in the room to explain away a bad verdict. The product has to be good
-*unattended*, on a stranger's real diff, on their first try. A bad verdict does
+_unattended_, on a stranger's real diff, on their first try. A bad verdict does
 not lose you a deal — it loses you the user silently, and they do not come back.
 
 The licence question, the open-source question, and the launch question all

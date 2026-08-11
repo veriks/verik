@@ -1,0 +1,16 @@
+# Normalise line endings.
+#
+# core.autocrlf=true on a Windows checkout hands Prettier CRLF files while it
+# expects LF, so `pnpm format:check` failed on 40 files locally and would have
+# failed the Windows leg of CI on the first push. Forcing LF in the working tree
+# makes every platform agree.
+#
+# It matters beyond formatting: scripts/install.sh and the generated pre-commit
+# hook are POSIX shell, and CRLF in either produces `\r: command not found` on
+# Linux and macOS.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.tgz binary

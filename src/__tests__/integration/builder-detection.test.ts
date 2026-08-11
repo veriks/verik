@@ -12,10 +12,13 @@ afterEach(async () => {
 describe('project detection', () => {
   it('detects a Node.js project with pnpm', async () => {
     repo = await createTestRepo();
-    await repo.write('package.json', JSON.stringify({
-      name: 'test',
-      scripts: { test: 'vitest', typecheck: 'tsc --noEmit', build: 'tsc', lint: 'eslint src' },
-    }));
+    await repo.write(
+      'package.json',
+      JSON.stringify({
+        name: 'test',
+        scripts: { test: 'vitest', typecheck: 'tsc --noEmit', build: 'tsc', lint: 'eslint src' },
+      }),
+    );
     await repo.write('pnpm-lock.yaml', '');
     await initWithCommit(repo);
 
@@ -91,7 +94,7 @@ describe('command planner', () => {
     };
 
     const planned = planCommands(detection, [
-      { name: 'test', command: 'npm test' },          // duplicate — should be skipped
+      { name: 'test', command: 'npm test' }, // duplicate — should be skipped
       { name: 'custom-check', command: 'node check.js' },
     ]);
 

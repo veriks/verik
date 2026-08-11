@@ -36,19 +36,19 @@ checked out.
 Verik is not tied to one vendor. Pick a provider at `verik init`, or set the
 environment variable and go.
 
-| Provider | Environment variable |
-|----------|---------------------|
-| Anthropic | `ANTHROPIC_API_KEY` |
-| OpenAI | `OPENAI_API_KEY` |
-| Google (Gemini) | `GEMINI_API_KEY` |
-| Mistral | `MISTRAL_API_KEY` |
-| DeepSeek | `DEEPSEEK_API_KEY` |
-| Groq | `GROQ_API_KEY` |
-| OpenRouter | `OPENROUTER_API_KEY` |
-| Together AI | `TOGETHER_API_KEY` |
-| Fireworks AI | `FIREWORKS_API_KEY` |
-| Hugging Face | `HF_TOKEN` |
-| Ollama | none — local, nothing leaves your machine |
+| Provider        | Environment variable                      |
+| --------------- | ----------------------------------------- |
+| Anthropic       | `ANTHROPIC_API_KEY`                       |
+| OpenAI          | `OPENAI_API_KEY`                          |
+| Google (Gemini) | `GEMINI_API_KEY`                          |
+| Mistral         | `MISTRAL_API_KEY`                         |
+| DeepSeek        | `DEEPSEEK_API_KEY`                        |
+| Groq            | `GROQ_API_KEY`                            |
+| OpenRouter      | `OPENROUTER_API_KEY`                      |
+| Together AI     | `TOGETHER_API_KEY`                        |
+| Fireworks AI    | `FIREWORKS_API_KEY`                       |
+| Hugging Face    | `HF_TOKEN`                                |
+| Ollama          | none — local, nothing leaves your machine |
 
 Each ships sensible default models. Override any stage individually:
 
@@ -138,29 +138,29 @@ that writes the code is never the one that decides whether to trust it.
 
 ## Two modes
 
-| Mode | Runs | API key |
-|------|------|---------|
-| `rules` | deterministic rules + Builder | No |
-| `full` | all four stages + rules | Yes |
+| Mode    | Runs                          | API key |
+| ------- | ----------------------------- | ------- |
+| `rules` | deterministic rules + Builder | No      |
+| `full`  | all four stages + rules       | Yes     |
 
 `rules` is fast, free and offline. Start there.
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `verik init` | Create `.verik/` with config and policy |
-| `verik run -- <cmd>` | Wrap a command, attribute what it changed |
-| `verik verify` | Verify the current uncommitted diff |
-| `verik begin` | Mark a baseline for agents that can't be wrapped |
-| `verik hook install` | Verify on every `git commit` |
-| `verik rules` | List and tune the 23 checks |
-| `verik policy` | Show or change how strict verification is |
-| `verik report` | Print the latest report |
-| `verik explain` | The verdict in plain English |
-| `verik runs` | Every run so far |
-| `verik inspect` | Context sent, files excluded, token usage |
-| `verik doctor` | Environment diagnostics |
+| Command              | Description                                      |
+| -------------------- | ------------------------------------------------ |
+| `verik init`         | Create `.verik/` with config and policy          |
+| `verik run -- <cmd>` | Wrap a command, attribute what it changed        |
+| `verik verify`       | Verify the current uncommitted diff              |
+| `verik begin`        | Mark a baseline for agents that can't be wrapped |
+| `verik hook install` | Verify on every `git commit`                     |
+| `verik rules`        | List and tune the 23 checks                      |
+| `verik policy`       | Show or change how strict verification is        |
+| `verik report`       | Print the latest report                          |
+| `verik explain`      | The verdict in plain English                     |
+| `verik runs`         | Every run so far                                 |
+| `verik inspect`      | Context sent, files excluded, token usage        |
+| `verik doctor`       | Environment diagnostics                          |
 
 ## Git hook
 
@@ -195,13 +195,13 @@ silently.
 
 ## Exit codes
 
-| Code | Meaning |
-|------|---------|
-| `0` | Passed, or the policy chose not to block |
-| `1` | Verik itself failed |
-| `2` | Policy blocked. Do not ship. |
-| `3` | Blocking mode, but verification reached no verdict |
-| other | The wrapped command's own exit code |
+| Code  | Meaning                                            |
+| ----- | -------------------------------------------------- |
+| `0`   | Passed, or the policy chose not to block           |
+| `1`   | Verik itself failed                                |
+| `2`   | Policy blocked. Do not ship.                       |
+| `3`   | Blocking mode, but verification reached no verdict |
+| other | The wrapped command's own exit code                |
 
 ## In CI
 
@@ -236,14 +236,14 @@ pnpm build
 pnpm test
 ```
 
-| Command | Description |
-|---------|-------------|
-| `pnpm build` | Bundle to `dist/` |
-| `pnpm build:bin` | Standalone binaries |
-| `pnpm test` | Vitest, 206 tests |
-| `pnpm lint` | ESLint |
-| `pnpm typecheck` | tsc, no emit |
-| `pnpm check` | Lint, types and format together |
+| Command          | Description                     |
+| ---------------- | ------------------------------- |
+| `pnpm build`     | Bundle to `dist/`               |
+| `pnpm build:bin` | Standalone binaries             |
+| `pnpm test`      | Vitest, 206 tests               |
+| `pnpm lint`      | ESLint                          |
+| `pnpm typecheck` | tsc, no emit                    |
+| `pnpm check`     | Lint, types and format together |
 
 ## Configuration
 
@@ -259,13 +259,13 @@ pnpm test
 }
 ```
 
-| Variable | Description |
-|----------|-------------|
-| `VERIK_API_KEY` | Key for any provider, overriding the provider-specific one |
-| `VERIK_BASE_URL` | Endpoint override — point at any OpenAI-compatible host |
-| `VERIK_MODEL_SCOUT` | Override the Scout model |
-| `VERIK_MODEL_REVIEWER` | Override the Reviewer model |
-| `VERIK_MODEL_JUDGE` | Override the Judge model |
+| Variable               | Description                                                |
+| ---------------------- | ---------------------------------------------------------- |
+| `VERIK_API_KEY`        | Key for any provider, overriding the provider-specific one |
+| `VERIK_BASE_URL`       | Endpoint override — point at any OpenAI-compatible host    |
+| `VERIK_MODEL_SCOUT`    | Override the Scout model                                   |
+| `VERIK_MODEL_REVIEWER` | Override the Reviewer model                                |
+| `VERIK_MODEL_JUDGE`    | Override the Judge model                                   |
 
 Or the provider's own key — see [Works with any model](#works-with-any-model).
 `rules` mode needs none of them.

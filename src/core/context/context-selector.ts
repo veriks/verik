@@ -39,8 +39,14 @@ export interface ContextSelectorOptions {
 }
 
 const MANIFEST_NAMES = [
-  'package.json', 'pyproject.toml', 'requirements.txt', 'setup.py',
-  'Cargo.toml', 'go.mod', 'pom.xml', 'build.gradle',
+  'package.json',
+  'pyproject.toml',
+  'requirements.txt',
+  'setup.py',
+  'Cargo.toml',
+  'go.mod',
+  'pom.xml',
+  'build.gradle',
 ];
 const README_NAMES = ['README.md', 'readme.md', 'README.txt'];
 
@@ -75,12 +81,15 @@ export async function selectContext(opts: ContextSelectorOptions): Promise<Selec
 
   // Changed files (excluding binary, lockfiles, secrets)
   const changedFiles: ContextFile[] = [];
-  const filteredPaths = diff.changedFiles
-    .filter((f) => f.changeType !== 'deleted' && !shouldExcludeFromLlm(f.path, excludePatterns));
+  const filteredPaths = diff.changedFiles.filter(
+    (f) => f.changeType !== 'deleted' && !shouldExcludeFromLlm(f.path, excludePatterns),
+  );
 
   for (const f of filteredPaths) {
     if (budget.remainingTokens < 500) {
-      limitations.push(`Skipped ${filteredPaths.length - changedFiles.length} files due to token budget.`);
+      limitations.push(
+        `Skipped ${filteredPaths.length - changedFiles.length} files due to token budget.`,
+      );
       break;
     }
     const slice = await sliceFile(repoRoot, f.path, maxFileBytes);

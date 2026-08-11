@@ -24,7 +24,7 @@ A developer runs `claude -p "add password reset"`. Ninety seconds later the
 working tree has changed. Three questions have no good answer today:
 
 1. **What did the agent actually change?** Not "what does `git diff` show" —
-   the tree was already dirty. What changed *because of that command*?
+   the tree was already dirty. What changed _because of that command_?
 2. **What was actually checked?** The agent says it's done. Did anything run?
    Did the tests pass before, and do they pass now?
 3. **Is it allowed to ship?** Who decided, on what evidence, and can that
@@ -56,13 +56,13 @@ pure git plumbing — no model involved, nothing to be wrong about.
 
 **How the baseline is obtained depends on how the agent runs:**
 
-| Agent | Command | Baseline |
-|---|---|---|
-| One-shot CLI (`claude -p`, `codex exec`, `aider --message`) | `verik run -- <cmd>` | Taken automatically around the command |
-| Interactive CLI session (`claude`, `aider`) | `verik run -- claude` | Around the whole session — coarser, still exact |
-| IDE agents (Cursor, Copilot, Windsurf) | `verik begin` … `verik verify` | Explicit checkpoint |
-| Desktop and web apps, pasted code | `verik begin` … `verik verify` | Explicit checkpoint |
-| CI, on a pull request | `verik verify --base <ref>` | The merge base |
+| Agent                                                       | Command                        | Baseline                                        |
+| ----------------------------------------------------------- | ------------------------------ | ----------------------------------------------- |
+| One-shot CLI (`claude -p`, `codex exec`, `aider --message`) | `verik run -- <cmd>`           | Taken automatically around the command          |
+| Interactive CLI session (`claude`, `aider`)                 | `verik run -- claude`          | Around the whole session — coarser, still exact |
+| IDE agents (Cursor, Copilot, Windsurf)                      | `verik begin` … `verik verify` | Explicit checkpoint                             |
+| Desktop and web apps, pasted code                           | `verik begin` … `verik verify` | Explicit checkpoint                             |
+| CI, on a pull request                                       | `verik verify --base <ref>`    | The merge base                                  |
 
 The checkpoint matters more than it looks: without it, an unwrappable agent
 degrades to "everything uncommitted", which cannot separate the agent's work
@@ -105,8 +105,8 @@ rather than a capability gap.
 
 ### A vendor cannot be an independent check on itself
 
-The product claim is: *the system that writes the code is not the system that
-decides whether it is safe to ship.* If Anthropic ships a verifier for Claude
+The product claim is: _the system that writes the code is not the system that
+decides whether it is safe to ship._ If Anthropic ships a verifier for Claude
 Code's output, that claim evaporates — it is marking its own homework. This is
 the same reason a firm cannot audit its own accounts. Not incompetence;
 structure.
@@ -116,7 +116,7 @@ independent verifier of itself, because independence is the property being sold.
 
 ### The buyer is multi-vendor; the labs are not
 
-Real engineering organisations run Claude Code *and* Cursor *and* Copilot *and*
+Real engineering organisations run Claude Code _and_ Cursor _and_ Copilot _and_
 aider, often in the same week. They need one trust surface across all of them,
 with one policy and one audit trail.
 
@@ -125,13 +125,13 @@ OpenAI has no reason to verify Claude's. Whoever owns this layer has to be
 neutral, and neutrality is not a feature a lab can add later — it is a thing you
 either are or are not.
 
-This is why Verik wraps *any* command and runs against *any* provider,
+This is why Verik wraps _any_ command and runs against _any_ provider,
 including local models. It is a strategic requirement, not a nice-to-have.
 
 ### The incentives point the other way
 
 A lab's product metric is task completion — the agent shipped your feature. A
-verifier's job is sometimes to say *no, not this one*. Those incentives are not
+verifier's job is sometimes to say _no, not this one_. Those incentives are not
 opposed in principle, but they are not aligned either, and organisations build
 what their metrics reward. Language vendors do not build the CI systems that
 gate their users' releases, for the same reason.
@@ -161,14 +161,14 @@ neither would we. Competing there is a race we would lose.
 
 Verik answers a different question.
 
-| | AI code reviewer | Verik |
-|---|---|---|
-| Input | A pull request diff | The change *one agent run* produced |
-| Question | "Any comments on this code?" | "What changed, what was checked, may it ship?" |
-| Evidence | Model opinion | Real command output + rules, with model opinion ranked below both |
-| Output | Comments | A verdict, an exit code, and a record |
-| Without an API key | Nothing | Rules and Builder still run |
-| Wrong answer costs | A noisy comment | A blocked build — so false positives are a first-class design concern |
+|                    | AI code reviewer             | Verik                                                                 |
+| ------------------ | ---------------------------- | --------------------------------------------------------------------- |
+| Input              | A pull request diff          | The change _one agent run_ produced                                   |
+| Question           | "Any comments on this code?" | "What changed, what was checked, may it ship?"                        |
+| Evidence           | Model opinion                | Real command output + rules, with model opinion ranked below both     |
+| Output             | Comments                     | A verdict, an exit code, and a record                                 |
+| Without an API key | Nothing                      | Rules and Builder still run                                           |
+| Wrong answer costs | A noisy comment              | A blocked build — so false positives are a first-class design concern |
 
 Three differences are structural rather than positional:
 
@@ -193,7 +193,7 @@ gaps between the claims above and the code today.
 
 - **The verdicts are unvalidated.** The pipeline has been run against a live API
   key on one repository, once. Nobody has measured precision or recall. Every
-  claim in §3 under *Judgement* is architectural, not empirical. This is the
+  claim in §3 under _Judgement_ is architectural, not empirical. This is the
   single most important open item.
 - ~~Policy cannot act on the strongest evidence.~~ **Closed.** Deterministic
   findings are now evaluated independently of, and before, the Judge — a rule at

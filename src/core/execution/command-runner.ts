@@ -43,11 +43,17 @@ export async function runCommand(
   // Named handlers so they can be removed after the child exits.
   // Anonymous lambdas passed to process.on() cannot be removed and accumulate
   // across multiple runs in the same process (e.g. tests).
-  const onSigint  = () => { logger.debug('Forwarding SIGINT');  child.kill('SIGINT');  };
-  const onSigterm = () => { logger.debug('Forwarding SIGTERM'); child.kill('SIGTERM'); };
-  const onAbort   = () => child.kill('SIGTERM');
+  const onSigint = () => {
+    logger.debug('Forwarding SIGINT');
+    child.kill('SIGINT');
+  };
+  const onSigterm = () => {
+    logger.debug('Forwarding SIGTERM');
+    child.kill('SIGTERM');
+  };
+  const onAbort = () => child.kill('SIGTERM');
 
-  process.on('SIGINT',  onSigint);
+  process.on('SIGINT', onSigint);
   process.on('SIGTERM', onSigterm);
 
   if (abortSignal.aborted) {
@@ -57,7 +63,7 @@ export async function runCommand(
   }
 
   const cleanup = () => {
-    process.off('SIGINT',  onSigint);
+    process.off('SIGINT', onSigint);
     process.off('SIGTERM', onSigterm);
     abortSignal.removeEventListener('abort', onAbort);
     stdoutStream.close();

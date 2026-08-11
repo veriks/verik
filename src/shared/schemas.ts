@@ -29,12 +29,12 @@ export const StageMetadataSchema = z.object({
   // Inference identity — lets you explain why the same change got different verdicts
   model: z.string().optional(),
   provider: z.string().optional(),
-  promptVersion: z.string().optional(),  // semver bumped when the prompt changes materially
-  promptHash: z.string().optional(),     // SHA256 of the rendered system prompt
-  inputHash: z.string().optional(),      // SHA256 of the serialised stage input
+  promptVersion: z.string().optional(), // semver bumped when the prompt changes materially
+  promptHash: z.string().optional(), // SHA256 of the rendered system prompt
+  inputHash: z.string().optional(), // SHA256 of the serialised stage input
 
   tokenUsage: TokenUsageSchema.optional(),
-  fromCache: z.boolean().optional(),     // true when this result came from verification cache
+  fromCache: z.boolean().optional(), // true when this result came from verification cache
   error: z.string().optional(),
 });
 export type StageMetadata = z.infer<typeof StageMetadataSchema>;

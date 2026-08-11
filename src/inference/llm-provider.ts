@@ -20,8 +20,8 @@ export interface StructuredGenerationResult<T> {
   durationMs: number;
   provider: string;
   model: string;
-  promptHash: string;   // SHA256 of systemPrompt — stable identity for this prompt version
-  inputHash: string;    // SHA256 of userContent — lets you detect same-input/different-output
+  promptHash: string; // SHA256 of systemPrompt — stable identity for this prompt version
+  inputHash: string; // SHA256 of userContent — lets you detect same-input/different-output
 }
 
 export interface LlmProvider {

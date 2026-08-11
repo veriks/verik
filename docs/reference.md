@@ -15,7 +15,7 @@ An independent verification runtime for AI-generated code. It answers one
 question a passing CI run cannot: **which lines did the agent write, and are
 they safe to ship?**
 
-The differentiated part is not "AI code review" — it is *attribution*. Verik
+The differentiated part is not "AI code review" — it is _attribution_. Verik
 can separate the agent's changes from the developer's own uncommitted work, in a
 dirty repository, without mutating that repository. Everything else is built on
 that.
@@ -34,10 +34,10 @@ Judge      →  weigh findings, issue a verdict  (LLM)
 
 ### Two modes
 
-| Mode | Runs | Needs an API key |
-|---|---|---|
-| `rules` | deterministic rules + Builder | **No** |
-| `full` | all four stages + rules | Yes |
+| Mode    | Runs                          | Needs an API key |
+| ------- | ----------------------------- | ---------------- |
+| `rules` | deterministic rules + Builder | **No**           |
+| `full`  | all four stages + rules       | Yes              |
 
 `rules` mode is the wedge: it is fast, free, offline, and strong enough to sit
 in a pre-commit hook.
@@ -51,6 +51,7 @@ in a pre-commit hook.
 ```sh
 verik init [--yes] [--mode rules|full]
 ```
+
 Creates `.verik/` with `config.json`, `policy.json`, `repo.json`. Interactive
 arrow-key onboarding unless `--yes`. Works in a repository with an unborn HEAD
 (`git init` with no commits) — that is a supported state, not an error.
@@ -58,6 +59,7 @@ arrow-key onboarding unless `--yes`. Works in a repository with an unborn HEAD
 ```sh
 verik doctor
 ```
+
 Environment diagnostics: git version, node version, API key presence, config
 validity.
 
@@ -134,12 +136,12 @@ verik override remove <override-id>
 
 **Which lever to use:**
 
-| Want | Use |
-|---|---|
-| This rule matters less here | `rules severity <id> <lower>` |
-| This rule does not apply at all | `rules disable <id> --reason` |
-| This *specific* finding is fine | `override add --rule <id> --path <file>` |
-| Nothing should block, just report | `policy mode advisory` |
+| Want                              | Use                                      |
+| --------------------------------- | ---------------------------------------- |
+| This rule matters less here       | `rules severity <id> <lower>`            |
+| This rule does not apply at all   | `rules disable <id> --reason`            |
+| This _specific_ finding is fine   | `override add --rule <id> --path <file>` |
+| Nothing should block, just report | `policy mode advisory`                   |
 
 Reach for `severity` first — the finding stays in the report and only stops
 crossing the blocking threshold, so no information is lost.
@@ -162,13 +164,13 @@ verik demo                 # exercises the whole pipeline, no network
 
 This contract is load-bearing. `src/core/run/exit-code.ts`.
 
-| Code | Meaning |
-|---|---|
-| `0` | Passed, or the policy chose not to block |
-| `1` | Verik itself failed (bad config, not a git repo, crash) |
-| `2` | **Policy blocked.** Do not ship this. |
-| `3` | Blocking mode, but verification never reached a verdict |
-| other | The wrapped command's own exit code, passed through |
+| Code  | Meaning                                                 |
+| ----- | ------------------------------------------------------- |
+| `0`   | Passed, or the policy chose not to block                |
+| `1`   | Verik itself failed (bad config, not a git repo, crash) |
+| `2`   | **Policy blocked.** Do not ship this.                   |
+| `3`   | Blocking mode, but verification never reached a verdict |
+| other | The wrapped command's own exit code, passed through     |
 
 Two false-green traps this design exists to prevent:
 
@@ -223,7 +225,7 @@ computeDiff(A, B)           → attributable diff
 ```
 
 Anything already dirty is baked into tree A, so it appears as **context** in the
-patch, not as an addition. A file the developer edited *and* the agent then
+patch, not as an addition. A file the developer edited _and_ the agent then
 edited further is attributed correctly at line granularity — the developer's
 line is context, the agent's is `+`.
 
@@ -236,8 +238,8 @@ line is context, the agent's is `+`.
 Branded types make it a compile error to send the wrong patch to a model.
 
 ```ts
-RawPatch    // real content, never leaves the machine
-SafePatch   // redacted + truncated, this is what goes to an LLM
+RawPatch; // real content, never leaves the machine
+SafePatch; // redacted + truncated, this is what goes to an LLM
 ```
 
 - **Redact, then truncate.** The other order can slice a secret in half and let
@@ -245,7 +247,7 @@ SafePatch   // redacted + truncated, this is what goes to an LLM
 - **Deterministic rules read the RAW patch, deliberately.** `SecretLeakRule`
   cannot detect a secret that has already been replaced with `[REDACTED]`.
   Rules run in-process and emit nothing to the network.
-- `privacy.excludePatterns` withholds file *content* but attribution still
+- `privacy.excludePatterns` withholds file _content_ but attribution still
   reports the file was touched — withholding is not the same as pretending
   nothing happened.
 - A secret is **never echoed into a finding excerpt**, because excerpts reach
@@ -255,35 +257,35 @@ SafePatch   // redacted + truncated, this is what goes to an LLM
 
 ## 6. The 23 deterministic rules
 
-Chosen for what an *agent* does wrong, not what a person does — that is the part
+Chosen for what an _agent_ does wrong, not what a person does — that is the part
 a general-purpose linter does not cover. An agent told to make the build pass has
 short paths available that a person would mention out loud.
 
-| Rule ID | Severity | Catches |
-|---|---|---|
-| `secret-leak` | critical | Credential added to the diff |
-| `insecure-transport` | critical | TLS verification disabled |
-| `env-file-added` | high | `.env` committed |
-| `weak-crypto` | high | MD5/SHA-1, ECB, predictable RNG used as a secret |
-| `sql-injection` | high | Query built by interpolation |
-| `command-injection` | high | Shell invoked with interpolated input |
-| `eval-usage` | high | `eval`, `new Function`, dynamic execution |
-| `stub-implementation` | high | `NotImplementedError`, `todo!()`, stubbed path |
-| `test-removal` | high | Test file deleted, or net assertions lost |
-| `tautological-assertion` | high | `expect(true).toBe(true)` — cannot fail |
-| `auth-check-removed` | high | Authorisation check deleted |
-| `risky-dependency-source` | high | Install hook, or git/URL dependency |
-| `permissive-access` | medium | CORS `*`, `chmod 777`, open CIDR |
-| `suppression-added` | medium | `eslint-disable`, `@ts-ignore`, `# noqa` |
-| `swallowed-error` | medium | `except: pass`, `catch {}` |
-| `disabled-tests` | medium | `.skip`, `xit`, `@Ignore`, `.only` |
-| `ci-workflow-modified` | medium | CI config or `.verik/policy.json` changed |
-| `gitignore-weakened` | medium | Ignore entry removed |
-| `db-migration` | medium | Migration added or modified |
-| `empty-catch` | low | Empty catch block |
-| `type-escape` | low | `as any`, `@ts-expect-error` |
-| `debug-artifact` | low | `console.log`, `debugger`, `pdb.set_trace` |
-| `lockfile-changed` | info | Lockfile modified |
+| Rule ID                   | Severity | Catches                                          |
+| ------------------------- | -------- | ------------------------------------------------ |
+| `secret-leak`             | critical | Credential added to the diff                     |
+| `insecure-transport`      | critical | TLS verification disabled                        |
+| `env-file-added`          | high     | `.env` committed                                 |
+| `weak-crypto`             | high     | MD5/SHA-1, ECB, predictable RNG used as a secret |
+| `sql-injection`           | high     | Query built by interpolation                     |
+| `command-injection`       | high     | Shell invoked with interpolated input            |
+| `eval-usage`              | high     | `eval`, `new Function`, dynamic execution        |
+| `stub-implementation`     | high     | `NotImplementedError`, `todo!()`, stubbed path   |
+| `test-removal`            | high     | Test file deleted, or net assertions lost        |
+| `tautological-assertion`  | high     | `expect(true).toBe(true)` — cannot fail          |
+| `auth-check-removed`      | high     | Authorisation check deleted                      |
+| `risky-dependency-source` | high     | Install hook, or git/URL dependency              |
+| `permissive-access`       | medium   | CORS `*`, `chmod 777`, open CIDR                 |
+| `suppression-added`       | medium   | `eslint-disable`, `@ts-ignore`, `# noqa`         |
+| `swallowed-error`         | medium   | `except: pass`, `catch {}`                       |
+| `disabled-tests`          | medium   | `.skip`, `xit`, `@Ignore`, `.only`               |
+| `ci-workflow-modified`    | medium   | CI config or `.verik/policy.json` changed        |
+| `gitignore-weakened`      | medium   | Ignore entry removed                             |
+| `db-migration`            | medium   | Migration added or modified                      |
+| `empty-catch`             | low      | Empty catch block                                |
+| `type-escape`             | low      | `as any`, `@ts-expect-error`                     |
+| `debug-artifact`          | low      | `console.log`, `debugger`, `pdb.set_trace`       |
+| `lockfile-changed`        | info     | Lockfile modified                                |
 
 ### Rule infrastructure
 
@@ -293,13 +295,13 @@ short paths available that a person would mention out loud.
   implemented. It owns the single scan loop.
   - **Rejects `/g` and `/y` regexes at construction.** A global regex driven by
     `.test()` carries `lastIndex` between calls and silently matches every
-    *second* occurrence. This was a real bug in `secret-leak`; it is now
+    _second_ occurrence. This was a real bug in `secret-leak`; it is now
     structurally impossible.
   - `LITERAL_ONLY` — a line that is only a regex or string literal is a pattern
     table or a test fixture, not logic. Without this, every security scanner,
     linter config and parser test suite reports its own source as vulnerable.
   - `COMMENT_ONLY` — prose describing a hazard is not the hazard. Opt out with
-    `skipComments: false` for rules whose subject *is* a comment.
+    `skipComments: false` for rules whose subject _is_ a comment.
   - `maxFindings` (default 10) per rule; `MAX_TOTAL_FINDINGS = 40` overall,
     sorted by severity before truncation.
 
@@ -339,11 +341,11 @@ produced **19 false positives and 0 real defects** before the three guards, and
 }
 ```
 
-| Mode | Effect |
-|---|---|
-| `shadow` | Records a verdict, never changes the exit code |
-| `advisory` | Reports findings, always exits 0 |
-| `blocking` | Exits 2 when a finding meets the threshold |
+| Mode       | Effect                                         |
+| ---------- | ---------------------------------------------- |
+| `shadow`   | Records a verdict, never changes the exit code |
+| `advisory` | Reports findings, always exits 0               |
+| `blocking` | Exits 2 when a finding meets the threshold     |
 
 **Deterministic findings are evaluated before and independently of the Judge,
 and are deliberately not gated on `minimumBlockingConfidence`.** That threshold
@@ -392,7 +394,7 @@ Installs a marker-delimited block into `pre-commit`:
   file git never runs. Resolved via `git config --get core.hooksPath`, falling
   back to `git rev-parse --git-path hooks` (correct in worktrees and submodules).
 - An existing hook ending in an unconditional `exit` would strand an appended
-  block. Detected; installs *before* it instead and says so.
+  block. Detected; installs _before_ it instead and says so.
 
 The hook runs `verik verify --mode rules` — full mode would call the API on
 every commit.
@@ -523,8 +525,7 @@ node dist/index.js verify                    # against this repo — expect 0 fi
 ## 13. Known gaps
 
 **Naming — unresolved.** `verik` cannot be published unscoped: npm's
-typosquat filter blocks it because the abandoned `cross-check` (last published
-2017) exists. Worse, **`verik-cli` is an active, unrelated project** by
+typosquat filter blocks it because the abandoned `cross-check` (last published 2017) exists. Worse, **`verik-cli` is an active, unrelated project** by
 `fxspeiser` — ~3.3k downloads/month, publishing near-daily, and it installs the
 same `verik` binary. `checkride` is also taken by an active AI coding tool.
 Options: ship scoped as `@veriks/verik` (binary can still be
