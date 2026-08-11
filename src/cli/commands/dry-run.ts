@@ -78,6 +78,9 @@ export function buildDryRunCommand(): Command {
         const planned = planCommands(detection, config.builder.commands ?? []);
         if (planned.length === 0) {
           console.log(`  ${dim('No commands detected')}`);
+          console.log(dim('  Verik looks for scripts named test, lint, typecheck or build.'));
+          console.log(dim('  Set them explicitly in .verik/config.json:'));
+          console.log(dim('    "builder": { "commands": ["npm run test", "npm run lint"] }'));
         } else {
           for (const p of planned) {
             console.log(`  ${green('→')} ${p.command}`);

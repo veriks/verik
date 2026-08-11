@@ -263,10 +263,13 @@ async function collectSetup(
     const model = await ask(
       'Model id',
       suggested,
-      spec.exampleModels ?? 'Used for all three stages. Enter to accept.',
+      spec.exampleModels ?? 'Applied to all three stages. Enter keeps the tiered defaults.',
     );
-    const chosen = model || suggested;
-    if (chosen) models = { scout: chosen, reviewer: chosen, judge: chosen };
+    // Only collapse the three stages onto one model if a different id was
+    // actually typed. Accepting the suggestion used to set all three to the
+    // Reviewer's model, which put the expensive one on Scout — the stage that
+    // runs on every diff and is meant to be the cheap one.
+    if (model && model !== suggested) models = { scout: model, reviewer: model, judge: model };
   }
 
   return { mode, provider, baseUrl, models };
