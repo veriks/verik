@@ -1,6 +1,13 @@
 name: CI
 
 on:
+  # Both, deliberately. Pull requests are the gate for contributions, but this
+  # project is developed by pushing straight to main — so a PR-only trigger
+  # meant the release branch was the one thing never tested. CI had not run once
+  # before this, on any platform, while main accumulated a rename, a line-ending
+  # change and a broken CJS build that release.yml depends on.
+  push:
+    branches: [main, master]
   pull_request:
     branches: [main, master]
 
