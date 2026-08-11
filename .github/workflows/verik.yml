@@ -45,18 +45,39 @@ jobs:
 
       - name: Verify the pull request
         env:
+          # Whichever is configured. Absent is fine — see below.
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           BASE_REF: ${{ github.event.pull_request.base.ref }}
           PR_TITLE: ${{ github.event.pull_request.title }}
         # A PR checkout is clean, so there are no uncommitted changes to inspect.
         # --base makes the change under review the range base..HEAD.
         #
-        # Exit codes: 0 pass/advisory · 2 policy block · 3 inconclusive
+        # Without a key this used to print a notice and exit 0 — a green check
+        # that had verified nothing, which is the exact failure this project
+        # exists to prevent. `rules` mode needs no key and no network, so the
+        # deterministic half always runs; a key only adds the LLM stages.
         run: |
-          if [ -z "$ANTHROPIC_API_KEY" ]; then
-            echo "::notice title=Verik skipped::ANTHROPIC_API_KEY is not set. Add it as a repository secret to enable self-verification."
-            exit 0
+          if [ -n "$ANTHROPIC_API_KEY" ] || [ -n "$OPENAI_API_KEY" ]; then
+            MODE=full
+          else
+            MODE=rules
+            echo "::notice title=Verik::No provider key set — running the 23 deterministic rules only. Add ANTHROPIC_API_KEY or OPENAI_API_KEY to enable the Scout, Reviewer and Judge stages."
           fi
-          node dist/index.js verify \
-            --base "origin/$BASE_REF" \
-            --intent "PR: $PR_TITLE"
+
+          set +e
+          node dist/index.js verify --mode "$MODE" --base "origin/$BASE_REF" --intent "PR: $PR_TITLE"
+          STATUS=$?
+          set -e
+
+          # Put the report on the checks page. Findings buried in a job log get
+          # read by nobody; a summary renders next to the check itself.
+          REPORT=$(ls -td .verik/runs/*/ 2>/dev/null | head -1)report.md
+          {
+            echo "## Verik — \`$MODE\` mode"
+            echo
+            if [ -f "$REPORT" ]; then cat "$REPORT"; else echo "No report produced."; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # 0 pass or advisory · 2 policy block · 3 blocking mode, no verdict
+          exit $STATUS
