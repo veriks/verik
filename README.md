@@ -69,8 +69,7 @@ export VERIK_API_KEY=your-key
 
 That covers LiteLLM, vLLM, LM Studio, self-hosted gateways, corporate proxies
 and anything behind a company firewall. Structured output degrades in three
-steps — `json_schema`, then `json_object`, then extracting JSON from plain text
-— so hosts that only implement part of the spec still work.
+steps, `json_schema`, then `json_object`, then extracting JSON from plain text, so hosts that only implement part of the spec still work.
 
 Not sure what your setup needs? `verik doctor` names the exact variable for your
 configured provider and checks the endpoint answers.
