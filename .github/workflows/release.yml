@@ -66,7 +66,7 @@ jobs:
 
             **curl (macOS / Linux)**
             ```sh
-            curl -fsSL https://raw.githubusercontent.com/verik-sh/verik/main/scripts/install.sh | sh
+            curl -fsSL https://raw.githubusercontent.com/veriks/verik/main/scripts/install.sh | sh
             ```
 
             **Direct download**

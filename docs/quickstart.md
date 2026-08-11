@@ -16,7 +16,7 @@ early.
 ## 1. Install
 
 ```sh
-git clone https://github.com/verik-sh/verik.git
+git clone https://github.com/veriks/verik.git
 cd verik
 pnpm install
 pnpm build
@@ -261,5 +261,5 @@ Also worth reporting:
 - Any case where it blocked something it shouldn't have, or missed something obvious
 
 Open an issue at
-[github.com/verik-sh/verik/issues](https://github.com/verik-sh/verik/issues),
+[github.com/veriks/verik/issues](https://github.com/veriks/verik/issues),
 or just paste the output of `verik report`.

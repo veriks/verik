@@ -527,7 +527,7 @@ typosquat filter blocks it because the abandoned `cross-check` (last published
 2017) exists. Worse, **`verik-cli` is an active, unrelated project** by
 `fxspeiser` — ~3.3k downloads/month, publishing near-daily, and it installs the
 same `verik` binary. `checkride` is also taken by an active AI coding tool.
-Options: ship scoped as `@verik-sh/verik` (binary can still be
+Options: ship scoped as `@veriks/verik` (binary can still be
 `verik`), or rename. Decision parked.
 
 **Not published to npm.** Needs `NPM_TOKEN` in repo secrets and a version tag.
