@@ -62,3 +62,7 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+
+      - name: Evaluation fixtures
+        run: pnpm build && pnpm eval

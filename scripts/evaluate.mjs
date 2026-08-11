@@ -29,6 +29,9 @@ function arg(name, fallback) {
 
 const FIXTURES = resolve(arg('fixtures', join(ROOT, 'datasets/evaluation/fixtures')));
 const FILTER = arg('filter', '');
+// `rules` scores deterministic findings and needs no API key, so it can gate
+// every push. `full` scores Judge verdicts and costs money.
+const MODE = arg('mode', 'rules');
 const SEVERITY = ['info', 'low', 'medium', 'high', 'critical'];
 
 async function exists(p) {
@@ -58,6 +61,18 @@ async function loadFixtures() {
   return out;
 }
 
+/** Every file under `dir`, as paths relative to it. */
+async function walk(dir, prefix = '') {
+  if (!(await exists(dir))) return [];
+  const out = [];
+  for (const e of await readdir(dir, { withFileTypes: true })) {
+    const rel = prefix ? `${prefix}/${e.name}` : e.name;
+    if (e.isDirectory()) out.push(...(await walk(join(dir, e.name), rel)));
+    else out.push(rel);
+  }
+  return out;
+}
+
 /** Builds a real repo: before/ committed, after/ laid over it uncommitted. */
 async function materialise(fixture) {
   const repo = await mkdtemp(join(tmpdir(), `cc-eval-${fixture.id}-`));
@@ -73,7 +88,15 @@ async function materialise(fixture) {
   await git(['commit', '-qm', 'baseline', '--allow-empty']);
 
   const after = join(fixture.dir, 'after');
-  if (await exists(after)) await cp(after, repo, { recursive: true, force: true });
+  if (await exists(after)) {
+    await cp(after, repo, { recursive: true, force: true });
+    // `after/` is the repository state after the command, so a file present in
+    // `before/` and absent here was deleted. Copying alone cannot express that,
+    // and a fixture for deleted coverage would silently produce no diff at all.
+    for (const rel of await walk(before)) {
+      if (!(await exists(join(after, rel)))) await rm(join(repo, rel), { force: true });
+    }
+  }
 
   return repo;
 }
@@ -81,7 +104,7 @@ async function materialise(fixture) {
 async function verify(repo) {
   const cli = join(ROOT, 'dist', 'index.js');
   try {
-    const { stdout } = await run(process.execPath, [cli, 'verify', '--json'], {
+    const { stdout } = await run(process.execPath, [cli, 'verify', '--json', '--mode', MODE], {
       cwd: repo,
       env: process.env,
       maxBuffer: 64 * 1024 * 1024,
@@ -110,6 +133,30 @@ async function verify(repo) {
 function score(expected, actual) {
   const failures = [];
   if (actual.error) return { pass: false, failures: [`harness: ${actual.error}`] };
+
+  const found = actual.findings ?? [];
+
+  // A fixture that must stay silent is the most valuable kind: it is the only
+  // thing that catches a rule becoming noisy, which is how this tool gets
+  // uninstalled.
+  if (expected.expectNoFindings) {
+    for (const f of found) {
+      failures.push(`false positive: ${f.ruleId} at ${f.file}:${f.line ?? '?'}`);
+    }
+  }
+
+  for (const want of expected.expectedRules ?? []) {
+    const hit = found.find(
+      (f) =>
+        f.ruleId === want.ruleId &&
+        (!want.file || f.file === want.file) &&
+        (!want.minSeverity || SEVERITY.indexOf(f.severity) >= SEVERITY.indexOf(want.minSeverity)),
+    );
+    if (!hit) {
+      const got = found.map((f) => f.ruleId).join(', ') || 'nothing';
+      failures.push(`missing rule ${want.ruleId}${want.file ? ` at ${want.file}` : ''} — got ${got}`);
+    }
+  }
 
   if (expected.expectedVerdict && actual.verdict !== expected.expectedVerdict) {
     failures.push(`verdict: expected ${expected.expectedVerdict}, got ${actual.verdict}`);
@@ -141,7 +188,7 @@ if (fixtures.length === 0) {
   process.exit(0);
 }
 
-if (!process.env.ANTHROPIC_API_KEY) {
+if (MODE === 'full' && !process.env.ANTHROPIC_API_KEY) {
   console.error('ANTHROPIC_API_KEY is not set. Every stage would fail and every');
   console.error('result would be inconclusive, which measures nothing. Refusing to run.');
   process.exit(1);

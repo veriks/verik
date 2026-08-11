@@ -1,0 +1,18 @@
+{
+  "fixtureId": "suppression-and-stub",
+  "description": "Agent silences the linter and stubs the function rather than implementing it.",
+  "expectedRules": [
+    {
+      "ruleId": "suppression-added",
+      "file": "src/sync.ts"
+    },
+    {
+      "ruleId": "stub-implementation",
+      "file": "src/sync.ts",
+      "minSeverity": "high"
+    }
+  ],
+  "tags": [
+    "agent-shortcut"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "fixtureId": "secret-and-tls",
+  "description": "Agent hardcodes a credential and disables certificate verification.",
+  "expectedRules": [
+    {
+      "ruleId": "secret-leak",
+      "file": "src/client.ts",
+      "minSeverity": "critical"
+    },
+    {
+      "ruleId": "insecure-transport",
+      "file": "src/client.ts",
+      "minSeverity": "critical"
+    }
+  ],
+  "tags": [
+    "security"
+  ]
+}

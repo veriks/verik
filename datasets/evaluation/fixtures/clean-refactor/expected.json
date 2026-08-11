@@ -1,0 +1,8 @@
+{
+  "fixtureId": "clean-refactor",
+  "description": "An ordinary refactor with no defects. Any finding here is a false positive.",
+  "expectNoFindings": true,
+  "tags": [
+    "false-positive"
+  ]
+}

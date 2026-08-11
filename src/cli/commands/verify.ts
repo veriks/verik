@@ -173,7 +173,19 @@ export function buildVerifyCommand(): Command {
           printVerdictSummary(pipeline, { runId, exitCode: 0, repoRoot: root }, flags.intent);
         }
         if (flags.json) {
-          console.log(JSON.stringify({ runId, verdict, policy: pipeline.policy }));
+          // Findings are part of the payload, not just the verdict. Without
+          // them --json says a run blocked but never what it found, so anything
+          // scripting against it has to go digging in the run directory.
+          console.log(
+            JSON.stringify({
+              runId,
+              verdict,
+              exitCode: exit.exitCode,
+              policy: pipeline.policy,
+              findings: pipeline.deterministicFindings,
+              suppressed: pipeline.suppressedFindings.length,
+            }),
+          );
         }
         if (exit.warning && !flags.quiet) console.error(exit.warning);
         process.exit(exit.exitCode);

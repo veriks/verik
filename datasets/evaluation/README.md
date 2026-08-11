@@ -45,9 +45,37 @@ evaluation/
 
 ```sh
 pnpm build
-ANTHROPIC_API_KEY=... pnpm eval
-pnpm eval --filter auth        # only fixtures whose id contains "auth"
+pnpm eval                      # rules mode — no API key, no network
+pnpm eval --filter secret      # only fixtures whose id contains "secret"
+pnpm eval --mode full          # scores Judge verdicts; needs ANTHROPIC_API_KEY
 ```
+
+`rules` is the default because it costs nothing and can gate every push. Only
+`--mode full` requires a key.
+
+## expectedRules schema
+
+For deterministic fixtures, assert the rules that must fire:
+
+```json
+{
+  "fixtureId": "secret-and-tls",
+  "description": "Agent hardcodes a credential and disables certificate verification.",
+  "expectedRules": [
+    { "ruleId": "secret-leak", "file": "src/client.ts", "minSeverity": "critical" }
+  ],
+  "tags": ["security"]
+}
+```
+
+Or assert silence, which is the more valuable kind:
+
+```json
+{ "fixtureId": "clean-refactor", "expectNoFindings": true }
+```
+
+Two of the seven fixtures expect nothing at all. A rule becoming noisy is how
+this tool gets uninstalled, and those are the only fixtures that catch it.
 
 Each fixture is materialised as a throwaway git repository — `before/` is
 committed to form the baseline, `after/` is laid over it uncommitted — so a run

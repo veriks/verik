@@ -1,0 +1,14 @@
+{
+  "fixtureId": "deleted-test",
+  "description": "Test file removed while the code it covered remains.",
+  "expectedRules": [
+    {
+      "ruleId": "test-removal",
+      "file": "src/token.test.ts",
+      "minSeverity": "high"
+    }
+  ],
+  "tags": [
+    "test-integrity"
+  ]
+}

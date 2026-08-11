@@ -1,0 +1,14 @@
+{
+  "fixtureId": "neutered-test",
+  "description": "A failing assertion replaced by one that cannot fail. Counting alone misses this.",
+  "expectedRules": [
+    {
+      "ruleId": "tautological-assertion",
+      "file": "src/auth.test.ts",
+      "minSeverity": "high"
+    }
+  ],
+  "tags": [
+    "test-integrity"
+  ]
+}

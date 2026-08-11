@@ -1,0 +1,8 @@
+{
+  "fixtureId": "pattern-table",
+  "description": "A security tool's own pattern table. Literals and comments must not be read as code.",
+  "expectNoFindings": true,
+  "tags": [
+    "false-positive"
+  ]
+}

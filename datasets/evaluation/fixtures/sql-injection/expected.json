@@ -1,0 +1,14 @@
+{
+  "fixtureId": "sql-injection",
+  "description": "Parameterised query rewritten as an interpolated template literal.",
+  "expectedRules": [
+    {
+      "ruleId": "sql-injection",
+      "file": "src/db.ts",
+      "minSeverity": "high"
+    }
+  ],
+  "tags": [
+    "security"
+  ]
+}
