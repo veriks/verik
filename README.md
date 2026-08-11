@@ -1,117 +1,198 @@
 # Verik
 
-Verik is an independent verification runtime for AI-generated code.
+**Verification for AI-generated code.**
+Mark a line. Let the agent work. See exactly what it changed.
 
-> **Unlike traditional AI code review, Verik separates generation from verification. The system that writes code is never the same system that decides whether it should be trusted..**
+[Quickstart](docs/quickstart.md) · [Reference](docs/reference.md) · [CI](docs/ci.md)
 
-## How it works
+## What is Verik?
 
-Verik wraps any coding agent or development command, captures the repository diff it produced, then independently verifies those changes through four isolated stages:
+Verik is an open-source CLI that checks what your AI coding agent actually
+changed. It separates the agent's edits from your own uncommitted work, runs
+your project's build and tests, applies 23 deterministic checks, and returns an
+exit code CI can act on.
 
-```
-Wrapped command
-      ↓
-Attributed repository diff
-      ↓
-   Scout
-      ↓
-   Builder
-      ↓
-  Reviewer
-      ↓
-   Judge
-      ↓
-Policy decision
-      ↓
-Terminal + report
-```
+**Why we built it:** a green build tells you the tests passed. It does not tell
+you the agent disabled TLS verification to make them pass, deleted the failing
+test, or replaced an assertion with `expect(true).toBe(true)`. As agents write
+more of the code, "CI is green" stops meaning "this is safe to ship."
 
-## Install
+**How it works:** Verik snapshots your working tree into a real git tree object,
+runs the agent, snapshots again, and diffs the two. Anything you had already
+half-finished is baked into the first snapshot, so it reads as context rather
+than as the agent's work. Your repository is never staged, stashed, committed or
+checked out.
 
-**Not yet published to npm.** Build from source — this takes about a minute:
+## Quick start
+
+Not on npm yet. Building from source takes about a minute:
 
 ```sh
 git clone https://github.com/veriks/verik.git
 cd verik && pnpm install && pnpm build && npm link
 ```
 
-Then `verik --version` should print `0.1.0`.
-
-Full walkthrough on a real repository: **[docs/quickstart.md](docs/quickstart.md)**
-
-## Quick start
+Then, in any repository:
 
 ```sh
-# 1. Initialize — `rules` mode needs no API key, no network
 verik init --yes --mode rules
-
-# 2. Wrap a coding agent or any command
-verik run -- claude -p "Add OAuth login"
-verik run -- codex
-verik run -- aider
-verik run -- amp
-verik verify
-
-# 3. Check the verdict
-verik report
-verik explain
+verik run -- claude -p "add rate limiting"
 ```
 
-Or stop having to remember it — verify on every commit:
+`rules` mode needs no API key and makes no network calls.
+
+If your agent runs somewhere Verik can't wrap it, like Cursor, Copilot or a
+desktop app, mark the baseline yourself instead:
 
 ```sh
-verik hook install
+verik begin        # then let the agent work
+verik verify
 ```
 
-Runs the deterministic rules (no API key, no network) before each `git commit`,
-and blocks only when your policy says to. An existing hook — husky, lint-staged,
-pre-commit — is preserved and still runs; `verik hook uninstall` puts it
-back exactly as it was. A single commit can always skip it with
-`git commit --no-verify`.
+## What you see
 
-## Trying it on a real repo
+```
+│  Builder   ✓ test  ✓ lint
 
-Step-by-step walkthrough, no API key needed: **[docs/quickstart.md](docs/quickstart.md)**
+RULES
+▊ CRITICAL TLS certificate verification disabled
+▊          src/http.ts:14 · insecure-transport
+▊ HIGH     Assertion that cannot fail
+▊          src/auth.test.ts:22 · tautological-assertion
+```
+
+The tests passed. That is the point.
+
+## Architecture
+
+**Attribution engine.** Builds real git tree objects through a scratch index and
+object store, then diffs tree to tree. This is what makes attribution work in a
+dirty repository without touching it.
+
+**Deterministic rules.** 23 local checks, no LLM, no network. They target what
+agents specifically get wrong: suppression comments, stubbed functions,
+swallowed errors, deleted tests, disabled TLS, interpolated SQL.
+
+**Builder.** Runs your project's own test, lint and build commands and reports
+what they said.
+
+**Policy engine.** Turns findings into an exit code. Advisory by default.
+
+**Scout, Reviewer, Judge.** Three LLM stages, only in `full` mode. The system
+that writes the code is never the one that decides whether to trust it.
+
+## Two modes
+
+| Mode | Runs | API key |
+|------|------|---------|
+| `rules` | deterministic rules + Builder | No |
+| `full` | all four stages + rules | Yes |
+
+`rules` is fast, free and offline. Start there.
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `verik init` | Create `.verik/` with config and policy files |
-| `verik run -- <cmd>` | Wrap and verify a command |
-| `verik verify` | Verify the current uncommitted diff (no command) |
-| `verik begin` | Mark a baseline, for agents that can't be wrapped |
+| `verik init` | Create `.verik/` with config and policy |
+| `verik run -- <cmd>` | Wrap a command, attribute what it changed |
+| `verik verify` | Verify the current uncommitted diff |
+| `verik begin` | Mark a baseline for agents that can't be wrapped |
 | `verik hook install` | Verify on every `git commit` |
-| `verik rules` | List and tune the deterministic rules |
+| `verik rules` | List and tune the 23 checks |
 | `verik policy` | Show or change how strict verification is |
-| `verik report [run-id]` | Print the latest (or specific) report |
-| `verik explain [run-id]` | Explain the latest verdict in plain English |
-| `verik status` | Show repository and Verik status |
-| `verik config` | Show the current configuration |
+| `verik report` | Print the latest report |
+| `verik explain` | The verdict in plain English |
+| `verik runs` | Every run so far |
+| `verik inspect` | Context sent, files excluded, token usage |
+| `verik doctor` | Environment diagnostics |
+
+## Git hook
+
+```sh
+verik hook install
+```
+
+Runs the deterministic rules before each commit. It is silent when clean,
+preserves any hook you already have (husky, lint-staged, pre-commit), and cannot
+break your git: if Verik fails or is missing, the commit goes through with a
+warning. Only a policy decision stops you.
+
+`git commit --no-verify` skips it once. `verik hook uninstall` restores your
+original hook byte for byte.
 
 ## Tuning
 
-A rule too noisy for your codebase has two levers, and they are not equivalent:
+A rule too noisy for your codebase has two levers:
 
 ```sh
-verik rules                                  # see all 23 and their severity
-verik rules severity debug-artifact info     # keep it, stop it blocking
+verik rules severity debug-artifact info
 verik rules disable type-escape --reason "generated protobuf bindings"
-verik policy mode advisory                   # report everything, block nothing
 ```
 
-Reach for `severity` first — the finding stays in the report, it just stops
-crossing the blocking threshold, so no information is lost. `disable` requires a
-written reason, which is stored in `.verik/policy.json` and therefore shows
-up in the pull request that turned the rule off.
+Reach for `severity` first. The finding stays in the report and only stops
+blocking, so nothing is lost. `disable` requires a reason, which is stored in
+`.verik/policy.json` and shows up in the pull request that turned the rule off.
 
-Even a disabled rule still runs. Its findings are recorded in the run record as
-suppressed, with the reason and who suppressed them, so switching a check off
-can never hide something without leaving a trace.
+Disabled rules still run. Their findings are recorded as suppressed, with the
+reason and who suppressed them, so switching a check off never hides anything
+silently.
+
+## Exit codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | Passed, or the policy chose not to block |
+| `1` | Verik itself failed |
+| `2` | Policy blocked. Do not ship. |
+| `3` | Blocking mode, but verification reached no verdict |
+| other | The wrapped command's own exit code |
+
+## In CI
+
+Your CI checkout is clean, so point Verik at a commit range:
+
+```sh
+verik verify --base origin/main
+```
+
+See [docs/ci.md](docs/ci.md) for a GitHub Actions example.
+
+## Project structure
+
+```
+src/
+  cli/commands/                          17 commands
+  cli/output/                            terminal renderer, prompts, theme
+  core/repository/                       attribution engine, checkpoints
+  core/hooks/                            git hook installer
+  core/policy/                           policy engine, rule tuning, overrides
+  core/pipeline/                         stage orchestration
+  stages/reviewer/deterministic-rules/   the 23 checks
+  inference/                             12 model providers
+  config/                                schemas and loader
+```
+
+## Local development
+
+```sh
+pnpm install
+pnpm build
+pnpm test
+```
+
+| Command | Description |
+|---------|-------------|
+| `pnpm build` | Bundle to `dist/` |
+| `pnpm build:bin` | Standalone binaries |
+| `pnpm test` | Vitest, 206 tests |
+| `pnpm lint` | ESLint |
+| `pnpm typecheck` | tsc, no emit |
+| `pnpm check` | Lint, types and format together |
 
 ## Configuration
 
-`verik init` creates `.verik/config.json`:
+`verik init` writes `.verik/config.json`:
 
 ```json
 {
@@ -123,83 +204,39 @@ can never hide something without leaving a trace.
 }
 ```
 
-### Model environment variables
+| Variable | Description |
+|----------|-------------|
+| `ANTHROPIC_API_KEY` | Required for `full` mode only |
+| `VERIK_MODEL_SCOUT` | Override the Scout model |
+| `VERIK_MODEL_REVIEWER` | Override the Reviewer model |
+| `VERIK_MODEL_JUDGE` | Override the Judge model |
 
-```sh
-export ANTHROPIC_API_KEY=...
-
-# Optional — override the per-stage defaults shown here.
-export VERIK_MODEL_SCOUT=claude-haiku-4-5
-export VERIK_MODEL_REVIEWER=claude-sonnet-5
-export VERIK_MODEL_JUDGE=claude-opus-5
-```
-
-## Policy
-
-`.verik/policy.json` controls how verdicts affect the exit code:
-
-| Mode | Behavior |
-|------|----------|
-| `shadow` | Record everything, always exit 0 |
-| `advisory` | Show findings, never block (default) |
-| `blocking` | Use Judge verdict to return exit code 2 on block |
-
-## Exit codes
-
-| Code | Meaning |
-|------|---------|
-| `0` | Passed, or the policy chose not to block |
-| `1` | Verik itself failed |
-| `2` | **Policy blocked** — do not ship |
-| `3` | Blocking mode, but verification never reached a verdict |
-| other | The wrapped command's own exit code, passed through |
-
-## Verification stages
-
-**Scout** — understands the scope, intent, and risk level of the change.
-
-**Builder** — runs your project's build, test, typecheck, and lint commands. Produces deterministic runtime evidence.
-
-**Reviewer** — deep evidence-based analysis. Every finding cites exact file paths and diff evidence.
-
-**Judge** — aggregates all evidence. Skeptical of the Reviewer — can dismiss unsupported findings. Returns a final verdict: `pass`, `warn`, `block`, or `inconclusive`.
-
-## Reports
-
-Every run stores under `.verik/runs/<run-id>/`:
-
-- `metadata.json` — run record
-- `diff.patch` — the diff produced by the wrapped command
-- `scout.json`, `builder.json`, `reviewer.json`, `judge.json` — stage outputs
-- `report.json`, `report.md` — the full report
-- `command.stdout.log`, `command.stderr.log` — command output
+Anthropic, OpenAI, Gemini, Mistral, DeepSeek, xAI, Groq and Cohere are supported
+directly. OpenRouter, Together, Fireworks and Hugging Face work as aggregators.
 
 ## Privacy
 
-- Secrets are redacted from diffs and logs before any LLM call
-- Environment variable values are never included in prompts
-- Files matching `excludePatterns` (`.env`, `*.pem`, `*.key`) are excluded
-- In `rules` mode nothing leaves the machine at all — no API key, no network
-
-## Development
-
-```sh
-pnpm install
-pnpm typecheck
-pnpm test
-pnpm build
-```
+Secrets are redacted from diffs before any model call. Environment variable
+values are never sent, only keys. Files matching `excludePatterns` (`.env`,
+`*.pem`, `*.key`) are withheld. In `rules` mode nothing leaves the machine.
 
 ## Principles
 
-Verik follows a few non-negotiable rules.
-
 - The verifier is independent from the generator.
-- Every finding references evidence.
-- AI recommendations never execute shell commands.
-- Deterministic evidence always takes precedence over model opinion.
-- Verik never mutates your repository during verification.
+- Every finding cites evidence.
+- Deterministic evidence outranks model opinion.
+- Verik never mutates your repository.
+- A missing verdict never reads as a pass.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Security issues: [SECURITY.md](SECURITY.md).
+
+## License
+
+Apache-2.0
 
 ---
 
-**This is an early verification system. It is not a guarantee of correctness or security.**
+**This is an early verification system. It is not a guarantee of correctness or
+security.**
