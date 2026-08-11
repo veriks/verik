@@ -15,6 +15,14 @@ early.
 
 ## 1. Install
 
+You need **Node 20 or newer**, **git**, and **pnpm**. Check:
+
+```sh
+node --version    # must be v20+
+git --version
+pnpm --version    # if missing: npm install -g pnpm
+```
+
 ```sh
 git clone https://github.com/veriks/verik.git
 cd verik
