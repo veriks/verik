@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Please report security issues privately via
-[GitHub Security Advisories](https://github.com/verik-sh/verik/security/advisories/new),
+[GitHub Security Advisories](https://github.com/veriks/verik/security/advisories/new),
 not as a public issue.
 
 We aim to acknowledge within 3 working days.

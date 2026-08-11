@@ -31,7 +31,7 @@ Terminal + report
 **Not yet published to npm.** Build from source — this takes about a minute:
 
 ```sh
-git clone https://github.com/verik-sh/verik.git
+git clone https://github.com/veriks/verik.git
 cd verik && pnpm install && pnpm build && npm link
 ```
 

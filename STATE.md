@@ -2,7 +2,7 @@
 
 **Last verified:** 9 August 2026
 **Branch:** `feat/tree-attribution-and-privacy-seam` → `main`
-**Remote:** https://github.com/verik-sh/verik (private)
+**Remote:** https://github.com/veriks/verik (private)
 
 This document is written for someone picking the project up cold, with their own
 Claude. Everything below was verified by running it, not recalled. Where something

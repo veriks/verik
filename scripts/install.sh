@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -e
 
-REPO="verik-sh/verik"
+REPO="veriks/verik"
 INSTALL_DIR="${VERIK_INSTALL_DIR:-/usr/local/bin}"
 
 # ─── detect platform ──────────────────────────────────────────────────────────
