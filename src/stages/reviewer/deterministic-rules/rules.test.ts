@@ -340,11 +340,16 @@ describe('repo integrity rules', () => {
     expect(deleted[0]!.severity).toBe('high');
   });
 
-  it("flags a change to verik's own policy file", async () => {
+  it("does not treat verik's own config as a CI gate", async () => {
+    // This asserted the opposite until a real user's first run reported
+    // ci-workflow-modified on .verik/policy.json — the tool flagging its own
+    // installation. The rule could never fire legitimately: the attribution
+    // engine excludes .verik/ from every tree it builds, so the test only
+    // passed because it handed the rule a file list that cannot occur.
     const found = await CiWorkflowModifiedRule.run(
       fileCtx([{ path: '.verik/policy.json', changeType: 'modified' }]),
     );
-    expect(found).toHaveLength(1);
+    expect(found).toEqual([]);
   });
 
   it('flags a deleted test file', async () => {

@@ -9,6 +9,7 @@ import { captureSnapshot } from '../../core/repository/repository-snapshot.js';
 import { computeDiff, type DiffResult } from '../../core/repository/diff-capture.js';
 import { createTreeWorkspace } from '../../core/repository/worktree-tree.js';
 import { writeCheckpoint, isStale, commitsSince } from '../../core/repository/checkpoint.js';
+import { ensureCheckpointStore } from '../../core/repository/worktree-tree.js';
 
 // git returns forward-slash paths on all platforms; normalise for assertions.
 const norm = (p: string) => p.replace(/\\/g, '/');
@@ -276,6 +277,46 @@ describe('getRepositoryInfo', () => {
     await repo.write('README.md', '# dirty');
     const dirty = await getRepositoryInfo(repo.root);
     expect(dirty.isDirty).toBe(true);
+  });
+});
+
+describe('verik never attributes its own directory', () => {
+  it('ignores a committed .verik/ when diffing against a checkpoint', async () => {
+    // Found on a first-time user's run. EXCLUDE_PATHSPECS filters the `git add`
+    // but the index is seeded from HEAD by read-tree, so a committed .verik/
+    // entered that way and was attributed to the agent: five files instead of
+    // one, and ci-workflow-modified firing on policy.json. Committing .verik/
+    // is the documented setup — config and policy are team-shared.
+    repo = await createTestRepo();
+    await initWithCommit(repo, 'src/app.ts', 'export const a = 1;');
+
+    await repo.write('.verik/config.json', '{"version":1,"provider":"anthropic"}');
+    await repo.write('.verik/policy.json', '{"version":1,"mode":"advisory"}');
+    await repo.commit('add verik config');
+
+    const info = await getRepositoryInfo(repo.root);
+    const cp = await writeCheckpoint(repo.root, info.branch, info.commitSha, true);
+
+    // The agent edits one file, and something also rewrites verik's own policy.
+    await repo.write('src/app.ts', 'export const a = 2;');
+    await repo.write('.verik/policy.json', '{"version":1,"mode":"blocking"}');
+
+    const ws = await createTreeWorkspace(repo.root, [await ensureCheckpointStore(repo.root)]);
+    try {
+      const final = await captureSnapshot(repo.root, ws, 'final');
+      const diff = await computeDiff({
+        root: repo.root,
+        workspace: ws,
+        baseline: { ...final, tree: cp.tree },
+        final,
+        maxDiffBytes: 500_000,
+        excludePatterns: EXCLUDE,
+      });
+      expect(diff.changedFiles.map((f) => norm(f.path))).toEqual(['src/app.ts']);
+      expect(diff.patch).not.toContain('.verik');
+    } finally {
+      await ws.dispose();
+    }
   });
 });
 

@@ -215,6 +215,18 @@ export async function buildWorktreeTree(
     await run(['read-tree', '--empty']);
   }
 
+  // read-tree brings in whatever HEAD holds, and EXCLUDE_PATHSPECS only filters
+  // the `add` below — so a committed `.verik/` entered the index here and was
+  // attributed to the agent. That is the documented setup: config.json and
+  // policy.json are meant to be committed and team-shared.
+  //
+  // The visible symptom was the tool reporting its own installation as the
+  // agent's work — five files instead of one, and ci-workflow-modified firing
+  // on .verik/policy.json — on a new user's first run.
+  await run(['rm', '--cached', '-r', '--ignore-unmatch', '--quiet', '--', '.verik']).catch(
+    () => undefined,
+  );
+
   // -A stages modifications, additions and deletions, tracked and untracked;
   // -u restricts that to already-tracked paths. Whichever is chosen must be
   // used for *both* trees — an asymmetric build fabricates changes.

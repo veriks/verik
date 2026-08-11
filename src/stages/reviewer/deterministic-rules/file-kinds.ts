@@ -44,9 +44,20 @@ export function isDocPath(path: string): boolean {
 const CI_FILE =
   /(^|\/)(\.github\/workflows\/.+\.ya?ml|\.gitlab-ci\.yml|azure-pipelines\.yml|Jenkinsfile|\.circleci\/config\.yml|\.travis\.yml|buildkite\.ya?ml)$/;
 
-/** The gates a change has to pass through — including this tool's own. */
+/**
+ * The gates a change has to pass through.
+ *
+ * This used to include `.verik/policy.json`, on the reasoning that a run which
+ * relaxes its own gate and then reports a pass is worthless. That check could
+ * never fire: the attribution engine excludes `.verik/` from every tree it
+ * builds, so the file cannot appear in a diff for a rule to see.
+ *
+ * Policy changes are still reviewable, through the mechanism that actually
+ * works — policy.json is committed, so weakening it shows up in the pull
+ * request, which is why `rules disable` demands a written reason.
+ */
 export function isCiPath(path: string): boolean {
-  return CI_FILE.test(path) || /(^|\/)\.verik\/policy\.json$/.test(path);
+  return CI_FILE.test(path);
 }
 
 /**
