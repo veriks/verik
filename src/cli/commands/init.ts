@@ -1,7 +1,7 @@
 import { block } from '../output/theme.js';
 import { formatError } from '../../shared/format-error.js';
 import { Command } from 'commander';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { getRepositoryInfo } from '../../core/repository/git-repository.js';
 import { VerikError } from '../../shared/errors.js';
@@ -33,6 +33,8 @@ interface Setup {
   baseUrl?: string;
   models: StageModels;
   policyMode: 'shadow' | 'advisory' | 'blocking';
+  /** False when nothing chose it — a bare --yes must not weaken an existing gate. */
+  policyChosen: boolean;
   installHook: boolean;
 }
 
@@ -57,6 +59,15 @@ interface Setup {
  * `claude-opus-5` into an OpenAI config and every stage 404'd on the first real
  * request. Each provider now carries its own.
  */
+/** Existing JSON, or undefined when absent or unreadable. */
+async function readJson(path: string): Promise<Record<string, unknown> | undefined> {
+  try {
+    return JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>;
+  } catch {
+    return undefined;
+  }
+}
+
 function modelsFor(provider: ProviderId): StageModels {
   const d = PROVIDERS[provider]?.defaultModels;
   return d ? { ...d } : { ...DEFAULT_MODELS };
@@ -168,11 +179,43 @@ export function buildInitCommand(): Command {
             models: setup.models,
           };
 
-          await writeFile(join(ccDir, 'config.json'), JSON.stringify(config, null, 2), 'utf8');
+          // Merge over what is already there rather than replacing it.
+          // Re-running init is ordinary — adding a provider to a repo set up in
+          // rules mode, say — and it used to discard builder.commands anyone had
+          // set by hand.
+          const existingConfig = await readJson(join(ccDir, 'config.json'));
+          // Shallow spread is not enough: `builder` and `privacy` are objects,
+          // so a fresh one replaced the whole section and dropped any
+          // builder.commands set by hand.
+          const mergedConfig: Record<string, unknown> = { ...existingConfig, ...config };
+          for (const key of ['builder', 'verification', 'privacy']) {
+            const before = existingConfig?.[key];
+            const after = (config as Record<string, unknown>)[key];
+            if (before && typeof before === 'object' && after && typeof after === 'object') {
+              mergedConfig[key] = { ...(before as object), ...(after as object) };
+            }
+          }
+          await writeFile(
+            join(ccDir, 'config.json'),
+            JSON.stringify(mergedConfig, null, 2),
+            'utf8',
+          );
           // The chosen mode, not the default. Everyone silently landed in
           // advisory before this, then found their first BLOCK verdict exited 0
           // and had no way to tell whether that was a bug.
-          const policy = { ...DEFAULT_POLICY, mode: setup.policyMode };
+          //
+          // Existing policy survives. A second init used to reset the mode and
+          // drop the whole `rules` block, so every disabled rule and the written
+          // reason for it — the record meant to show up in a pull request —
+          // vanished silently. Only the mode is taken from the new answer.
+          const existingPolicy = await readJson(join(ccDir, 'policy.json'));
+          const hadPolicy = existingPolicy !== undefined;
+          // A bare `init --yes` in an already-configured repo must not downgrade
+          // blocking to advisory just because that is the flag default.
+          const mode = setup.policyChosen
+            ? setup.policyMode
+            : (existingPolicy?.['mode'] ?? setup.policyMode);
+          const policy = { ...DEFAULT_POLICY, ...existingPolicy, mode };
           await writeFile(join(ccDir, 'policy.json'), JSON.stringify(policy, null, 2), 'utf8');
           // objects/ and checkpoint.json are local baseline state — meaningless
           // in someone else's clone and noisy in a diff.
@@ -190,7 +233,12 @@ export function buildInitCommand(): Command {
           await reveal(
             checklist([
               { label: 'config', detail: '.verik/config.json' },
-              { label: 'policy', detail: `.verik/policy.json · ${setup.policyMode}` },
+              {
+                label: 'policy',
+                detail: `.verik/policy.json · ${String(policy.mode)}${
+                  hadPolicy ? ' · existing tuning kept' : ''
+                }`,
+              },
               { label: 'repo id', detail: fingerprint.repoId },
             ]),
           );
@@ -292,6 +340,7 @@ async function collectSetup(
       // --yes is for CI and scripts: never touch the user's git hooks, and
       // never turn on a gate they did not ask for.
       policyMode: parsePolicy(options.policy) ?? DEFAULT_POLICY.mode,
+      policyChosen: parsePolicy(options.policy) !== undefined,
       installHook: Boolean(options.hook),
     };
   }
@@ -326,6 +375,7 @@ async function collectSetup(
       provider: 'anthropic',
       models: { ...DEFAULT_MODELS },
       policyMode,
+      policyChosen: true,
       installHook,
     };
   }
@@ -383,7 +433,7 @@ async function collectSetup(
 
   const policyMode = await askPolicy(options, 3, 4);
   const installHook = await askHook(options, 4, 4);
-  return { mode, provider, baseUrl, models, policyMode, installHook };
+  return { mode, provider, baseUrl, models, policyMode, policyChosen: true, installHook };
 }
 
 async function printSummary(setup: Setup): Promise<void> {

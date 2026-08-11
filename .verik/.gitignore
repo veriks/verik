@@ -1,2 +1,4 @@
 runs/
 cache/
+objects/
+checkpoint.json
