@@ -99,21 +99,30 @@ git clone https://github.com/veriks/verik.git
 cd verik && pnpm install && pnpm build && npm link
 ```
 
-### 2. Set it up in your project — once
+### 2. Set it up in your project
 
 ```sh
 cd ~/your-project
-verik init --yes --mode rules
-verik policy mode blocking
-verik hook install
+verik init
 ```
 
-That is the whole setup. Every `git commit` now runs 23 deterministic checks
-first, and a finding at `high` or above stops the commit. No API key, no
-network, silent when your code is clean.
+Four questions: how much you want it to do, which provider (only if you chose
+the LLM stages), what should happen when it finds something, and whether to
+check every commit automatically. Say yes to the last two and setup is done.
 
-Any hook you already have — husky, lint-staged — keeps working. `git commit
---no-verify` skips it once, and `verik hook uninstall` removes it exactly.
+Every `git commit` then runs 23 deterministic checks first, and a finding at
+`high` or above stops it. No API key, no network, silent when your code is
+clean. Any hook you already have — husky, lint-staged — keeps working, and
+`verik hook uninstall` removes it exactly.
+
+Scripting it instead:
+
+```sh
+verik init --yes --mode rules --policy blocking --hook
+```
+
+`--yes` alone stays safe for CI: advisory, no hook, nothing gated you did not
+ask for.
 
 ### 3. Using it with an AI agent
 

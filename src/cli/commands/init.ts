@@ -2,7 +2,7 @@ import { block } from '../output/theme.js';
 import { formatError } from '../../shared/format-error.js';
 import { Command } from 'commander';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { getRepositoryInfo } from '../../core/repository/git-repository.js';
 import { VerikError } from '../../shared/errors.js';
 import { DEFAULT_CONFIG, DEFAULT_POLICY, DEFAULT_MODELS } from '../../config/defaults.js';
@@ -32,6 +32,8 @@ interface Setup {
   provider: ProviderId;
   baseUrl?: string;
   models: StageModels;
+  policyMode: 'shadow' | 'advisory' | 'blocking';
+  installHook: boolean;
 }
 
 /**
@@ -60,78 +62,169 @@ function modelsFor(provider: ProviderId): StageModels {
   return d ? { ...d } : { ...DEFAULT_MODELS };
 }
 
+type PolicyMode = 'shadow' | 'advisory' | 'blocking';
+
+function parsePolicy(value: string | undefined): PolicyMode | undefined {
+  return value === 'shadow' || value === 'advisory' || value === 'blocking' ? value : undefined;
+}
+
+/**
+ * What should happen when something is found.
+ *
+ * This was never asked. Everyone got `advisory`, which always exits 0, and then
+ * had to discover `verik policy mode blocking` in the docs to make the tool do
+ * anything. Blocking leads because a verifier that cannot stop a change is a
+ * report, and advisory is one keypress away for anyone who wants to look before
+ * they enforce.
+ */
+async function askPolicy(
+  options: { policy?: string },
+  step: number,
+  total: number,
+): Promise<PolicyMode> {
+  const flag = parsePolicy(options.policy);
+  if (flag) return flag;
+  return select<PolicyMode>({
+    header: stepHeader(mark(), step, total),
+    question: 'What should happen when Verik finds something?',
+    choices: [
+      {
+        value: 'blocking',
+        label: 'Block it',
+        hint: 'Exit 2 at high severity or above — fails the commit and fails CI',
+      },
+      {
+        value: 'advisory',
+        label: 'Just tell me',
+        hint: 'Reports everything, always exits 0. Change later with `verik policy mode`',
+      },
+      {
+        value: 'shadow',
+        label: 'Record quietly',
+        hint: 'Writes a verdict to the run record and says nothing',
+      },
+    ],
+  });
+}
+
+/** Verification you have to remember is verification that does not happen. */
+async function askHook(options: { hook?: boolean }, step: number, total: number): Promise<boolean> {
+  if (options.hook) return true;
+  return select<boolean>({
+    header: stepHeader(mark(), step, total),
+    question: 'Check every commit automatically?',
+    choices: [
+      {
+        value: true,
+        label: 'Yes, install the git hook',
+        hint: 'Runs the deterministic rules before each commit. Silent when clean',
+      },
+      {
+        value: false,
+        label: 'Not now',
+        hint: 'Run `verik verify` yourself, or `verik hook install` later',
+      },
+    ],
+  });
+}
+
 export function buildInitCommand(): Command {
   return new Command('init')
     .description('Set up Verik in the current repository')
     .option('-y, --yes', 'Accept defaults without prompting (for CI and scripts)')
     .option('--provider <id>', 'Inference provider (skips the prompt)')
     .option('--mode <mode>', 'rules | full')
-    .action(async (options: { yes?: boolean; provider?: string; mode?: string }) => {
-      try {
-        const info = await getRepositoryInfo(process.cwd());
-        const ccDir = join(info.root, '.verik');
-        const interactive = isInteractive() && !options.yes;
+    .option('--policy <mode>', 'shadow | advisory | blocking')
+    .option('--hook', 'Install the pre-commit hook without asking')
+    .action(
+      async (options: {
+        yes?: boolean;
+        provider?: string;
+        mode?: string;
+        policy?: string;
+        hook?: boolean;
+      }) => {
+        try {
+          const info = await getRepositoryInfo(process.cwd());
+          const ccDir = join(info.root, '.verik');
+          const interactive = isInteractive() && !options.yes;
 
-        if (interactive) console.log(banner());
-        // Printed even under --yes: what was detected is information, and a CI
-        // log showing "no build commands found" explains a later empty Builder
-        // stage far better than silence does.
-        await printDetected(info.root, info.branch, info.isDirty);
+          if (interactive) console.log(banner());
+          // Printed even under --yes: what was detected is information, and a CI
+          // log showing "no build commands found" explains a later empty Builder
+          // stage far better than silence does.
+          await printDetected(info.root, info.branch, info.isDirty);
 
-        const setup = await collectSetup(options, interactive);
+          const setup = await collectSetup(options, interactive);
 
-        await mkdir(join(ccDir, 'runs'), { recursive: true });
-        await mkdir(join(ccDir, 'cache'), { recursive: true });
+          await mkdir(join(ccDir, 'runs'), { recursive: true });
+          await mkdir(join(ccDir, 'cache'), { recursive: true });
 
-        const config = {
-          ...DEFAULT_CONFIG,
-          provider: setup.provider,
-          mode: setup.mode,
-          ...(setup.baseUrl ? { baseUrl: setup.baseUrl } : {}),
-          models: setup.models,
-        };
+          const config = {
+            ...DEFAULT_CONFIG,
+            provider: setup.provider,
+            mode: setup.mode,
+            ...(setup.baseUrl ? { baseUrl: setup.baseUrl } : {}),
+            models: setup.models,
+          };
 
-        await writeFile(join(ccDir, 'config.json'), JSON.stringify(config, null, 2), 'utf8');
-        await writeFile(
-          join(ccDir, 'policy.json'),
-          JSON.stringify(DEFAULT_POLICY, null, 2),
-          'utf8',
-        );
-        // objects/ and checkpoint.json are local baseline state — meaningless
-        // in someone else's clone and noisy in a diff.
-        await writeFile(
-          join(ccDir, '.gitignore'),
-          'runs/\ncache/\nobjects/\ncheckpoint.json\n',
-          'utf8',
-        );
+          await writeFile(join(ccDir, 'config.json'), JSON.stringify(config, null, 2), 'utf8');
+          // The chosen mode, not the default. Everyone silently landed in
+          // advisory before this, then found their first BLOCK verdict exited 0
+          // and had no way to tell whether that was a bug.
+          const policy = { ...DEFAULT_POLICY, mode: setup.policyMode };
+          await writeFile(join(ccDir, 'policy.json'), JSON.stringify(policy, null, 2), 'utf8');
+          // objects/ and checkpoint.json are local baseline state — meaningless
+          // in someone else's clone and noisy in a diff.
+          await writeFile(
+            join(ccDir, '.gitignore'),
+            'runs/\ncache/\nobjects/\ncheckpoint.json\n',
+            'utf8',
+          );
 
-        // Create a stable repo fingerprint immediately so memory is scoped
-        // correctly from the very first run, not only after the first LLM call.
-        const fingerprint = await getOrCreateFingerprint(info.root, info.remote);
+          // Create a stable repo fingerprint immediately so memory is scoped
+          // correctly from the very first run, not only after the first LLM call.
+          const fingerprint = await getOrCreateFingerprint(info.root, info.remote);
 
-        console.log(`\n  ${section('written')}`);
-        await reveal(
-          checklist([
-            { label: 'config', detail: '.verik/config.json' },
-            { label: 'policy', detail: `.verik/policy.json · ${DEFAULT_POLICY.mode}` },
-            { label: 'repo id', detail: fingerprint.repoId },
-          ]),
-        );
+          console.log(`\n  ${section('written')}`);
+          await reveal(
+            checklist([
+              { label: 'config', detail: '.verik/config.json' },
+              { label: 'policy', detail: `.verik/policy.json · ${setup.policyMode}` },
+              { label: 'repo id', detail: fingerprint.repoId },
+            ]),
+          );
 
-        await printSummary(setup);
-      } catch (err) {
-        if (err instanceof PromptCancelled) {
-          console.log(subtle('\n  Cancelled. Nothing was written.\n'));
-          process.exit(130);
+          if (setup.installHook) {
+            const { installHook } = await import('../../core/hooks/git-hooks.js');
+            const result = await installHook(info.root, { mode: setup.mode });
+            console.log(
+              checklist([
+                {
+                  label: 'hook',
+                  detail: `${relative(info.root, result.target.path) || result.target.path}${
+                    result.preservedForeignContent ? ' · existing hook preserved' : ''
+                  }`,
+                },
+              ]).join('\n'),
+            );
+          }
+
+          await printSummary(setup);
+        } catch (err) {
+          if (err instanceof PromptCancelled) {
+            console.log(subtle('\n  Cancelled. Nothing was written.\n'));
+            process.exit(130);
+          }
+          if (err instanceof VerikError) {
+            console.error('Error:', err.message);
+            process.exit(err.exitCode);
+          }
+          console.error(`${block('✕')} ${formatError(err)}`);
+          process.exit(1);
         }
-        if (err instanceof VerikError) {
-          console.error('Error:', err.message);
-          process.exit(err.exitCode);
-        }
-        console.error(`${block('✕')} ${formatError(err)}`);
-        process.exit(1);
-      }
-    });
+      },
+    );
 }
 
 /**
@@ -181,7 +274,7 @@ async function printDetected(root: string, branch: string, dirty: boolean): Prom
 }
 
 async function collectSetup(
-  options: { provider?: string; mode?: string },
+  options: { provider?: string; mode?: string; policy?: string; hook?: boolean },
   interactive: boolean,
 ): Promise<Setup> {
   const flagMode = options.mode === 'rules' || options.mode === 'full' ? options.mode : undefined;
@@ -192,7 +285,15 @@ async function collectSetup(
 
   if (!interactive || (flagMode && (flagMode === 'rules' || flagProvider))) {
     const provider = flagProvider ?? 'anthropic';
-    return { mode: flagMode ?? 'full', provider, models: modelsFor(provider) };
+    return {
+      mode: flagMode ?? 'full',
+      provider,
+      models: modelsFor(provider),
+      // --yes is for CI and scripts: never touch the user's git hooks, and
+      // never turn on a gate they did not ask for.
+      policyMode: parsePolicy(options.policy) ?? DEFAULT_POLICY.mode,
+      installHook: Boolean(options.hook),
+    };
   }
 
   // Rules mode asks one question; full asks two. Showing "of 2" and then
@@ -218,7 +319,15 @@ async function collectSetup(
     }));
 
   if (mode === 'rules') {
-    return { mode, provider: 'anthropic', models: { ...DEFAULT_MODELS } };
+    const policyMode = await askPolicy(options, 2, 3);
+    const installHook = await askHook(options, 3, 3);
+    return {
+      mode,
+      provider: 'anthropic',
+      models: { ...DEFAULT_MODELS },
+      policyMode,
+      installHook,
+    };
   }
 
   const provider =
@@ -272,7 +381,9 @@ async function collectSetup(
     if (model && model !== suggested) models = { scout: model, reviewer: model, judge: model };
   }
 
-  return { mode, provider, baseUrl, models };
+  const policyMode = await askPolicy(options, 3, 4);
+  const installHook = await askHook(options, 4, 4);
+  return { mode, provider, baseUrl, models, policyMode, installHook };
 }
 
 async function printSummary(setup: Setup): Promise<void> {
