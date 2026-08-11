@@ -57,7 +57,12 @@ export async function migrateLegacyDir(repoRoot: string): Promise<boolean> {
 export async function migrateIfNeeded(cwd: string): Promise<void> {
   try {
     const root = (await simpleGit(cwd).revparse(['--show-toplevel'])).trim();
-    if (root) await migrateLegacyDir(root);
+    if (!root) return;
+    await migrateLegacyDir(root);
+    // Before any command resolves a provider, so a key in .env is already in
+    // the environment by the time doctor or a stage looks for one.
+    const { loadDotenv } = await import('../config/dotenv.js');
+    await loadDotenv(root);
   } catch {
     // Not a repository. Nothing to do.
   }

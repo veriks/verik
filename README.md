@@ -71,6 +71,17 @@ That covers LiteLLM, vLLM, LM Studio, self-hosted gateways, corporate proxies
 and anything behind a company firewall. Structured output degrades in three
 steps, `json_schema`, then `json_object`, then extracting JSON from plain text, so hosts that only implement part of the spec still work.
 
+Or put it in a `.env` file at the repository root, which avoids shell syntax
+differences entirely:
+
+```sh
+OPENAI_API_KEY=sk-...
+```
+
+Shell variables always win over the file. `.env` is gitignored by default and is
+in `privacy.excludePatterns`, so the file Verik reads the key from is the same
+one it refuses to send to a model.
+
 Not sure what your setup needs? `verik doctor` names the exact variable for your
 configured provider and checks the endpoint answers.
 
