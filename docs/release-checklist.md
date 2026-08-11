@@ -118,7 +118,16 @@ verik hook install && verik hook uninstall    # must restore cleanly
 
 ### Once, before the first release
 
-- [ ] `NPM_TOKEN` in repo secrets — an automation token, not a login one.
+- [ ] `NPM_TOKEN` in repo secrets — a **granular** npm token scoped to the
+      `verik` package with an expiry, not a classic token that can publish
+      everything you own. Add it the day you publish, not before: until it
+      exists there is nothing for a collaborator to take.
+- [ ] Reviewers on the `release` environment — **Settings → Environments →
+      release → Required reviewers**. The workflow already requests that
+      environment, but without reviewers it gates nothing. This is what stops
+      write access alone from being enough to publish.
+- [ ] Testers get **read** access, not write. Write access means the ability to
+      push a tag, and to push a workflow that reads the token.
 - [ ] Repo made visible, if the release is public.
 - [ ] `release.yml` prerelease handling fixed (section 1).
 - [ ] Green CI on all three platforms.

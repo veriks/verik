@@ -13,6 +13,14 @@ jobs:
   build-binaries:
     name: Build binaries
     runs-on: ubuntu-latest
+    # Publishing is the one irreversible thing this repo does, and NPM_TOKEN is
+    # readable by any workflow anyone with write access can push. Requiring an
+    # environment means a reviewer has to approve the run before the token is
+    # handed over, so write access alone is not enough to publish.
+    #
+    # Add reviewers under Settings > Environments > release. Without them the
+    # environment exists but gates nothing.
+    environment: release
 
     steps:
       - uses: actions/checkout@v4
