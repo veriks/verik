@@ -48,6 +48,18 @@ interface Setup {
  * detected and shown as a badge rather than asked about, so the common path is
  * two keypresses.
  */
+/**
+ * Starting models for a provider.
+ *
+ * DEFAULT_MODELS is Anthropic-only, so using it for every provider wrote
+ * `claude-opus-5` into an OpenAI config and every stage 404'd on the first real
+ * request. Each provider now carries its own.
+ */
+function modelsFor(provider: ProviderId): StageModels {
+  const d = PROVIDERS[provider]?.defaultModels;
+  return d ? { ...d } : { ...DEFAULT_MODELS };
+}
+
 export function buildInitCommand(): Command {
   return new Command('init')
     .description('Set up Verik in the current repository')
@@ -179,11 +191,8 @@ async function collectSetup(
       : undefined;
 
   if (!interactive || (flagMode && (flagMode === 'rules' || flagProvider))) {
-    return {
-      mode: flagMode ?? 'full',
-      provider: flagProvider ?? 'anthropic',
-      models: { ...DEFAULT_MODELS },
-    };
+    const provider = flagProvider ?? 'anthropic';
+    return { mode: flagMode ?? 'full', provider, models: modelsFor(provider) };
   }
 
   // Rules mode asks one question; full asks two. Showing "of 2" and then
@@ -245,13 +254,19 @@ async function collectSetup(
       ? await ask('Base URL', 'https://', 'An OpenAI-compatible /chat/completions endpoint.')
       : undefined;
 
-  // Anthropic ships verified tiered defaults. For anything else the ids differ
-  // per host and change often, so ask rather than guess — a wrong default only
-  // surfaces as a confusing 404 on the first real request.
-  let models: StageModels = { ...DEFAULT_MODELS };
+  // Ids differ per host and change often, so the prompt stays — but it is
+  // prefilled with the provider's own default rather than left empty. Pressing
+  // enter used to fall back to Anthropic ids, which cannot work anywhere else.
+  let models: StageModels = modelsFor(provider);
   if (provider !== 'anthropic') {
-    const model = await ask('Model id', '', spec.exampleModels ?? 'Used for all three stages.');
-    if (model) models = { scout: model, reviewer: model, judge: model };
+    const suggested = models.reviewer;
+    const model = await ask(
+      'Model id',
+      suggested,
+      spec.exampleModels ?? 'Used for all three stages. Enter to accept.',
+    );
+    const chosen = model || suggested;
+    if (chosen) models = { scout: chosen, reviewer: chosen, judge: chosen };
   }
 
   return { mode, provider, baseUrl, models };

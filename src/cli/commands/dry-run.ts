@@ -2,6 +2,7 @@ import { block, bold, muted as dim, pass as green, warn as yellow } from '../out
 import { formatError } from '../../shared/format-error.js';
 import { Command } from 'commander';
 import { getRepositoryInfo } from '../../core/repository/git-repository.js';
+import { PROVIDERS, resolveApiKey } from '../../inference/providers.js';
 import { computeWorktreeDiff } from '../../core/repository/diff-capture.js';
 import { loadConfig, loadPolicy } from '../../config/config-loader.js';
 import { getOrCreateFingerprint } from '../../core/repository/repo-fingerprint.js';
@@ -110,9 +111,11 @@ export function buildDryRunCommand(): Command {
 
         // Models
         console.log(bold('Models'));
-        const apiKey = process.env['ANTHROPIC_API_KEY'];
-        if (!apiKey) {
-          console.log(`  ${block('✗')} ANTHROPIC_API_KEY not set — LLM stages would be skipped`);
+        const spec = PROVIDERS[config.provider];
+        const keyVar = spec?.apiKeyEnv ?? 'ANTHROPIC_API_KEY';
+        const apiKey = spec ? resolveApiKey(spec) : undefined;
+        if (!apiKey && !spec?.keyOptional) {
+          console.log(`  ${block('✗')} ${keyVar} not set — LLM stages would be skipped`);
         } else {
           console.log(`  Scout:    ${config.models.scout}`);
           console.log(`  Reviewer: ${config.models.reviewer}`);

@@ -2,6 +2,12 @@ import { Command } from 'commander';
 import { block, pass, warn } from '../output/theme.js';
 import Anthropic from '@anthropic-ai/sdk';
 import { getRepositoryInfo } from '../../core/repository/git-repository.js';
+import {
+  PROVIDERS,
+  resolveApiKey,
+  type ProviderId,
+  type ProviderSpec,
+} from '../../inference/providers.js';
 import { loadConfig, loadPolicy } from '../../config/config-loader.js';
 import { validateBuilderCommands } from '../../stages/builder/command-allowlist.js';
 import { join } from 'node:path';
@@ -91,12 +97,24 @@ export function buildDoctorCommand(): Command {
         }),
       );
 
-      // 5. API key present
-      const apiKey = process.env['ANTHROPIC_API_KEY'];
+      // 5. API key present.
+      //
+      // Which variable that is depends on the configured provider. This used to
+      // read ANTHROPIC_API_KEY unconditionally, so doctor told anyone on
+      // OpenAI, Gemini or a local runtime that their key was missing when it
+      // was not — from the one command whose job is diagnosing exactly that.
+      const providerId = await loadConfig(repoRoot)
+        .then((c) => c.provider)
+        .catch(() => 'anthropic' as const);
+      const spec = PROVIDERS[providerId as ProviderId] as ProviderSpec | undefined;
+      const keyVar = spec?.apiKeyEnv ?? 'ANTHROPIC_API_KEY';
+      const apiKey = spec ? resolveApiKey(spec) : undefined;
       results.push(
-        await check('ANTHROPIC_API_KEY is set', async () => {
-          if (apiKey) return 'ok';
-          return { fail: 'Set ANTHROPIC_API_KEY to enable AI verification stages' };
+        await check(`${keyVar} is set`, async () => {
+          if (apiKey || spec?.keyOptional) return 'ok';
+          return {
+            fail: `Set ${keyVar} to enable AI verification stages (provider: ${providerId})`,
+          };
         }),
       );
 

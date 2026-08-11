@@ -39,17 +39,32 @@ export interface ProviderSpec {
   docs: string;
   /** Illustrative model ids — shown as hints, never used as defaults. */
   exampleModels?: string;
+  /**
+   * Models used when the provider is selected and none are configured.
+   *
+   * Without this, `init` wrote Anthropic ids whatever provider you chose, so
+   * picking OpenAI sent `claude-opus-5` to api.openai.com and every stage
+   * failed. These are starting points, not endorsements — ids move, and
+   * VERIK_MODEL_{SCOUT,REVIEWER,JUDGE} overrides any of them.
+   */
+  defaultModels: { scout: string; reviewer: string; judge: string };
 }
 
 export const PROVIDERS: Record<ProviderId, ProviderSpec> = {
   anthropic: {
     id: 'anthropic',
+    defaultModels: {
+      scout: 'claude-haiku-4-5',
+      reviewer: 'claude-sonnet-5',
+      judge: 'claude-opus-5',
+    },
     label: 'Anthropic',
     apiKeyEnv: 'ANTHROPIC_API_KEY',
     docs: 'https://console.anthropic.com/settings/keys',
   },
   openai: {
     id: 'openai',
+    defaultModels: { scout: 'gpt-4o-mini', reviewer: 'gpt-4o', judge: 'gpt-4o' },
     label: 'OpenAI',
     baseUrl: 'https://api.openai.com/v1',
     apiKeyEnv: 'OPENAI_API_KEY',
@@ -57,6 +72,11 @@ export const PROVIDERS: Record<ProviderId, ProviderSpec> = {
   },
   openrouter: {
     id: 'openrouter',
+    defaultModels: {
+      scout: 'openai/gpt-4o-mini',
+      reviewer: 'anthropic/claude-sonnet-4.5',
+      judge: 'anthropic/claude-sonnet-4.5',
+    },
     label: 'OpenRouter (many models, one key)',
     baseUrl: 'https://openrouter.ai/api/v1',
     apiKeyEnv: 'OPENROUTER_API_KEY',
@@ -65,6 +85,11 @@ export const PROVIDERS: Record<ProviderId, ProviderSpec> = {
   },
   google: {
     id: 'google',
+    defaultModels: {
+      scout: 'gemini-2.0-flash',
+      reviewer: 'gemini-2.0-flash',
+      judge: 'gemini-2.0-flash',
+    },
     label: 'Google (Gemini)',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
     apiKeyEnv: 'GEMINI_API_KEY',
@@ -72,6 +97,11 @@ export const PROVIDERS: Record<ProviderId, ProviderSpec> = {
   },
   mistral: {
     id: 'mistral',
+    defaultModels: {
+      scout: 'mistral-small-latest',
+      reviewer: 'mistral-large-latest',
+      judge: 'mistral-large-latest',
+    },
     label: 'Mistral',
     baseUrl: 'https://api.mistral.ai/v1',
     apiKeyEnv: 'MISTRAL_API_KEY',
@@ -79,6 +109,11 @@ export const PROVIDERS: Record<ProviderId, ProviderSpec> = {
   },
   deepseek: {
     id: 'deepseek',
+    defaultModels: {
+      scout: 'deepseek-chat',
+      reviewer: 'deepseek-chat',
+      judge: 'deepseek-reasoner',
+    },
     label: 'DeepSeek',
     baseUrl: 'https://api.deepseek.com/v1',
     apiKeyEnv: 'DEEPSEEK_API_KEY',
@@ -86,6 +121,11 @@ export const PROVIDERS: Record<ProviderId, ProviderSpec> = {
   },
   groq: {
     id: 'groq',
+    defaultModels: {
+      scout: 'llama-3.3-70b-versatile',
+      reviewer: 'llama-3.3-70b-versatile',
+      judge: 'llama-3.3-70b-versatile',
+    },
     label: 'Groq',
     baseUrl: 'https://api.groq.com/openai/v1',
     apiKeyEnv: 'GROQ_API_KEY',
@@ -93,6 +133,11 @@ export const PROVIDERS: Record<ProviderId, ProviderSpec> = {
   },
   together: {
     id: 'together',
+    defaultModels: {
+      scout: 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
+      reviewer: 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
+      judge: 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
+    },
     label: 'Together AI',
     baseUrl: 'https://api.together.xyz/v1',
     apiKeyEnv: 'TOGETHER_API_KEY',
@@ -100,6 +145,11 @@ export const PROVIDERS: Record<ProviderId, ProviderSpec> = {
   },
   fireworks: {
     id: 'fireworks',
+    defaultModels: {
+      scout: 'accounts/fireworks/models/llama-v3p3-70b-instruct',
+      reviewer: 'accounts/fireworks/models/llama-v3p3-70b-instruct',
+      judge: 'accounts/fireworks/models/llama-v3p3-70b-instruct',
+    },
     label: 'Fireworks AI',
     baseUrl: 'https://api.fireworks.ai/inference/v1',
     apiKeyEnv: 'FIREWORKS_API_KEY',
@@ -107,6 +157,11 @@ export const PROVIDERS: Record<ProviderId, ProviderSpec> = {
   },
   huggingface: {
     id: 'huggingface',
+    defaultModels: {
+      scout: 'meta-llama/Llama-3.3-70B-Instruct',
+      reviewer: 'meta-llama/Llama-3.3-70B-Instruct',
+      judge: 'meta-llama/Llama-3.3-70B-Instruct',
+    },
     label: 'Hugging Face',
     baseUrl: 'https://router.huggingface.co/v1',
     apiKeyEnv: 'HF_TOKEN',
@@ -114,6 +169,7 @@ export const PROVIDERS: Record<ProviderId, ProviderSpec> = {
   },
   ollama: {
     id: 'ollama',
+    defaultModels: { scout: 'llama3.2', reviewer: 'llama3.2', judge: 'llama3.2' },
     label: 'Ollama (local, no key, no data leaves your machine)',
     baseUrl: 'http://localhost:11434/v1',
     apiKeyEnv: 'OLLAMA_API_KEY',
@@ -122,6 +178,7 @@ export const PROVIDERS: Record<ProviderId, ProviderSpec> = {
   },
   custom: {
     id: 'custom',
+    defaultModels: { scout: '', reviewer: '', judge: '' },
     label: 'Custom OpenAI-compatible endpoint',
     apiKeyEnv: 'VERIK_API_KEY',
     keyOptional: true,
