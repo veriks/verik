@@ -1,12 +1,17 @@
-# Verik
+<p align="center">
+  <img src="assets/logo.png" alt="Verik" width="320">
+</p>
 
-**Verification for AI-generated code.**
-Mark a line. Let the agent work. See exactly what it changed.
+<p align="center">
+  <strong>Your agent says it's done. Verik tells you what it actually did.</strong><br>
+  Not an AI code reviewer. An independent check on code you didn't write.
+</p>
 
-<img width="381" height="141" alt="image" src="https://github.com/user-attachments/assets/13897a61-79b9-4635-81fc-5f3e34307226" />
-
-
-[Quickstart](docs/quickstart.md) · [Reference](docs/reference.md) · [CI](docs/ci.md)
+<p align="center">
+  <a href="docs/quickstart.md">Quickstart</a> ·
+  <a href="docs/reference.md">Reference</a> ·
+  <a href="docs/ci.md">CI</a>
+</p>
 
 ## What is Verik?
 
