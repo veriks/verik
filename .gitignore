@@ -2,8 +2,8 @@ node_modules/
 dist/
 dist-bin/
 releases/
-.crosscheck/runs/
-.crosscheck/cache/
+.verik/runs/
+.verik/cache/
 *.log
 .env
 .env.*

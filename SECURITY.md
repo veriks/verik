@@ -3,14 +3,14 @@
 ## Reporting a vulnerability
 
 Please report security issues privately via
-[GitHub Security Advisories](https://github.com/crosscheck-sh/crosscheck/security/advisories/new),
+[GitHub Security Advisories](https://github.com/verik-sh/verik/security/advisories/new),
 not as a public issue.
 
 We aim to acknowledge within 3 working days.
 
 ## Why this matters more than for most CLIs
 
-Crosscheck reads the full diff of the repository it runs in and sends part of it
+Verik reads the full diff of the repository it runs in and sends part of it
 to a third-party inference API. A bug in the privacy seam is a data-disclosure
 bug, not a correctness bug. The following are in scope and treated as high
 severity:
@@ -37,14 +37,14 @@ security regression:
    in-process and emit nothing to the network. Redacting their input would blind
    the secret-leak rule.
 4. File reads are resolved with `realpath` and confined to the repository root.
-5. Crosscheck never mutates the repository under verification. Tree building
+5. Verik never mutates the repository under verification. Tree building
    redirects the index and object store to a temp directory.
 
 ## Scope
 
-The `.crosscheck/` directory holds unredacted local forensic artifacts,
+The `.verik/` directory holds unredacted local forensic artifacts,
 including `diff.patch`. This is intentional — a redacted forensic record is
-useless when triaging a leak — and `.crosscheck/runs/` is gitignored by default.
+useless when triaging a leak — and `.verik/runs/` is gitignored by default.
 Do not attach it to a public CI job or issue.
 
 ## Supported versions

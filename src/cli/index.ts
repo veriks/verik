@@ -1,4 +1,7 @@
 import { Command } from 'commander';
+import { migrateIfNeeded } from '../storage/migrate.js';
+import { formatError } from '../shared/format-error.js';
+import { block } from './output/theme.js';
 import { buildRunCommand } from './commands/run.js';
 import { buildInitCommand } from './commands/init.js';
 import { buildStatusCommand } from './commands/status.js';
@@ -23,7 +26,7 @@ const VERSION = '0.1.0';
 const program = new Command();
 
 program
-  .name('crosscheck')
+  .name('verik')
   .description('Independent verification runtime for AI-generated code')
   .version(VERSION, '-v, --version', 'Print version')
   .addHelpText('beforeAll', banner() + '\n')
@@ -31,14 +34,14 @@ program
     'after',
     `
 Examples:
-  crosscheck init
-  crosscheck run -- claude -p "Add password reset"
-  crosscheck verify
-  crosscheck runs
-  crosscheck report
-  crosscheck explain
-  crosscheck inspect
-  crosscheck override add --rule secret-leak --reason "dev env only"
+  verik init
+  verik run -- claude -p "Add password reset"
+  verik verify
+  verik runs
+  verik report
+  verik explain
+  verik inspect
+  verik override add --rule secret-leak --reason "dev env only"
 `,
   );
 
@@ -60,7 +63,13 @@ program.addCommand(buildOverrideCommand());
 program.addCommand(buildDemoCommand());
 program.addCommand(buildConfigCommand());
 
+// `.crosscheck/` predates the rename and holds the config, the policy, the
+// checkpoint and every run record. Move it before any command resolves a path,
+// so an existing install keeps its baseline and history instead of silently
+// starting over.
+await migrateIfNeeded(process.cwd());
+
 program.parseAsync(process.argv).catch((err) => {
-  console.error('Error:', String(err));
+  console.error(`${block('✕')} ${formatError(err)}`);
   process.exit(1);
 });

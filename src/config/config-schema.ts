@@ -58,7 +58,7 @@ export const ProviderIdSchema = z.enum([
  */
 export const VerificationModeSchema = z.enum(['rules', 'full']);
 
-export const CrosscheckConfigSchema = z.object({
+export const VerikConfigSchema = z.object({
   version: z.literal(1),
   provider: ProviderIdSchema.default('anthropic'),
   /** Overrides the provider's default endpoint. Required for `custom`. */
@@ -72,7 +72,7 @@ export const CrosscheckConfigSchema = z.object({
   runsToKeep: z.number().default(100), // prune older runs automatically
 });
 
-export type CrosscheckConfig = z.infer<typeof CrosscheckConfigSchema>;
+export type VerikConfig = z.infer<typeof VerikConfigSchema>;
 
 /**
  * Turning a rule off is a decision someone should be able to review.

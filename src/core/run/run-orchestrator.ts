@@ -29,7 +29,7 @@ const generateId = customAlphabet(
 );
 
 export function generateRunId(): string {
-  return `ccr_${generateId()}`;
+  return `vk_${generateId()}`;
 }
 
 export interface OrchestratorResult {
@@ -99,7 +99,7 @@ export async function orchestrateRun(
     }
 
     // Print a clear separator so users can tell where the agent output ended
-    // and Crosscheck verification begins. Skip in quiet/JSON mode.
+    // and Verik verification begins. Skip in quiet/JSON mode.
     if (!flags.quiet && !flags.json) {
       printVerificationSeparator();
     }
@@ -127,12 +127,12 @@ export async function orchestrateRun(
     });
 
     await saveRunJson(repoRoot, runId, 'metadata.json', record);
-    // Raw, deliberately: `.crosscheck/runs/` is gitignored and local, and a
+    // Raw, deliberately: `.verik/runs/` is gitignored and local, and a
     // redacted forensic artifact is worse than useless when triaging a leak.
     await saveRunFile(repoRoot, runId, 'diff.patch', diff.patch);
 
     if (diff.changedFiles.length === 0 && !flags.verbose) {
-      logger.info('Crosscheck: no repository changes detected.');
+      logger.info('Verik: no repository changes detected.');
       const finalRecord = { ...record, status: 'completed' as const };
       await saveRunJson(repoRoot, runId, 'metadata.json', finalRecord);
       return { runId, exitCode: commandResult.exitCode, repoRoot };

@@ -24,7 +24,7 @@ export interface ChangedFile {
 export interface DiffResult {
   /**
    * Unredacted git output. Local forensics only — writing it to
-   * `.crosscheck/runs/` is fine (gitignored, and the secrets are already in the
+   * `.verik/runs/` is fine (gitignored, and the secrets are already in the
    * user's worktree), sending it anywhere is not. The type enforces this.
    */
   patch: RawPatch;
@@ -123,7 +123,7 @@ export async function computeWorktreeDiff(opts: {
    */
   baseRef?: string;
   /**
-   * An explicit baseline tree, from `crosscheck begin`. Takes precedence over
+   * An explicit baseline tree, from `verik begin`. Takes precedence over
    * both `baseRef` and HEAD — it is the only baseline that can separate an
    * unwrappable agent's work from the developer's own.
    */

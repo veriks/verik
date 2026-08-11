@@ -13,7 +13,7 @@ export function buildReviewerPrompt(
 ): { system: string; user: string } {
   const { diff, config, selectedContext } = context;
 
-  const system = `You are Reviewer, the deep analysis stage of the Crosscheck verification pipeline.
+  const system = `You are Reviewer, the deep analysis stage of the Verik verification pipeline.
 Analyze the code change for correctness, security, data integrity, and reliability issues.
 Every finding MUST cite specific file paths and line evidence from the diff or file contents provided.
 Do not invent requirements. Do not repeat what linters or the deterministic rules already caught without adding analysis.

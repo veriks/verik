@@ -1,4 +1,4 @@
-# Crosscheck — Positioning
+# Verik — Positioning
 
 **Status:** working position. Written 10 August 2026.
 Companion to [product-strategy.md](product-strategy.md) (how it monetises) and
@@ -9,7 +9,7 @@ Companion to [product-strategy.md](product-strategy.md) (how it monetises) and
 
 ## 1. In one line
 
-Crosscheck is the trust layer for AI-written code: it proves what an agent
+Verik is the trust layer for AI-written code: it proves what an agent
 changed, what was checked, what evidence supports the result, and whether policy
 permits it to ship.
 
@@ -39,13 +39,13 @@ does not, and the fraction of code no human read before merge goes up.
 
 ---
 
-## 3. What Crosscheck does
+## 3. What Verik does
 
 Four claims, in the order they matter.
 
 ### Provenance — what the agent touched
 
-Crosscheck snapshots the repository as a git tree before the agent works and
+Verik snapshots the repository as a git tree before the agent works and
 again after, then diffs the two trees. The result is the **attributable diff**:
 the agent's contribution, isolated from work that was already in progress, down
 to the hunk. A file you had half-edited before the agent touched it yields only
@@ -58,16 +58,16 @@ pure git plumbing — no model involved, nothing to be wrong about.
 
 | Agent | Command | Baseline |
 |---|---|---|
-| One-shot CLI (`claude -p`, `codex exec`, `aider --message`) | `crosscheck run -- <cmd>` | Taken automatically around the command |
-| Interactive CLI session (`claude`, `aider`) | `crosscheck run -- claude` | Around the whole session — coarser, still exact |
-| IDE agents (Cursor, Copilot, Windsurf) | `crosscheck begin` … `crosscheck verify` | Explicit checkpoint |
-| Desktop and web apps, pasted code | `crosscheck begin` … `crosscheck verify` | Explicit checkpoint |
-| CI, on a pull request | `crosscheck verify --base <ref>` | The merge base |
+| One-shot CLI (`claude -p`, `codex exec`, `aider --message`) | `verik run -- <cmd>` | Taken automatically around the command |
+| Interactive CLI session (`claude`, `aider`) | `verik run -- claude` | Around the whole session — coarser, still exact |
+| IDE agents (Cursor, Copilot, Windsurf) | `verik begin` … `verik verify` | Explicit checkpoint |
+| Desktop and web apps, pasted code | `verik begin` … `verik verify` | Explicit checkpoint |
+| CI, on a pull request | `verik verify --base <ref>` | The merge base |
 
 The checkpoint matters more than it looks: without it, an unwrappable agent
 degrades to "everything uncommitted", which cannot separate the agent's work
 from the developer's — and IDE agents are plausibly the largest segment. The
-checkpoint tree is a real git tree in Crosscheck's own object store, so
+checkpoint tree is a real git tree in Verik's own object store, so
 attribution is identical in kind to the wrapped path. The repository is never
 written to.
 
@@ -125,7 +125,7 @@ OpenAI has no reason to verify Claude's. Whoever owns this layer has to be
 neutral, and neutrality is not a feature a lab can add later — it is a thing you
 either are or are not.
 
-This is why Crosscheck wraps *any* command and runs against *any* provider,
+This is why Verik wraps *any* command and runs against *any* provider,
 including local models. It is a strategic requirement, not a nice-to-have.
 
 ### The incentives point the other way
@@ -159,9 +159,9 @@ AI code review is a commodity: GitHub ships one, every IDE ships one, and the
 differentiator is model quality — which none of those products control and
 neither would we. Competing there is a race we would lose.
 
-Crosscheck answers a different question.
+Verik answers a different question.
 
-| | AI code reviewer | Crosscheck |
+| | AI code reviewer | Verik |
 |---|---|---|
 | Input | A pull request diff | The change *one agent run* produced |
 | Question | "Any comments on this code?" | "What changed, what was checked, may it ship?" |

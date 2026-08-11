@@ -28,9 +28,9 @@ function shortPath(absolute: string): string {
 }
 
 export function printHeader(runId: string): void {
-  const left = `${mark()}  ${bold('crosscheck')}`;
+  const left = `${mark()}  ${bold('verik')}`;
   // Pad on the raw text, not the coloured string — escape codes have no width.
-  const rawLeft = `${MARK_RAW}  crosscheck`;
+  const rawLeft = `${MARK_RAW}  verik`;
   const gap = Math.max(1, frameWidth() - rawLeft.length - runId.length);
   console.log(`\n${left}${' '.repeat(gap)}${subtle(runId)}`);
   console.log(rule());
@@ -43,10 +43,10 @@ export function printCommand(command: string[]): void {
 /**
  * Separator printed after the wrapped command exits and before verification
  * begins. Gives a clear visual break so users know where the agent output ends
- * and Crosscheck output begins.
+ * and Verik output begins.
  */
 export function printVerificationSeparator(): void {
-  console.log(`\n${rule('crosscheck')}\n`);
+  console.log(`\n${rule('verik')}\n`);
 }
 
 export function printChanges(additions: number, deletions: number, fileCount: number): void {

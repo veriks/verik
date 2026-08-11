@@ -15,7 +15,7 @@ buys. Product-led growth, the same path Slack, Figma, Linear, Postman and
 Datadog took.
 
 This is **not** B2C. B2C is someone spending their own money on personal use. A
-developer running Crosscheck against work they do for an employer is B2B, just
+developer running Verik against work they do for an employer is B2B, just
 entered from the bottom.
 
 The distinction matters because **the user and the buyer are different people**:
@@ -34,7 +34,7 @@ are worthless without the user's adoption first.
 
 **This is the core commercial insight. Everything else follows from it.**
 
-Crosscheck today is entirely local — your machine, your API key, `.crosscheck/`
+Verik today is entirely local — your machine, your API key, `.verik/`
 on your disk, `memory.json` inside your repo. That architecture already draws the
 line.
 
@@ -96,7 +96,7 @@ the same work. Exploit that overlap — it is rare.
 
 ### Where the audience already is
 
-Crosscheck wraps other people's tools (`crosscheck run -- claude -p "..."`), so
+Verik wraps other people's tools (`verik run -- claude -p "..."`), so
 the distribution channel is those tools' communities: Claude Code, Cursor, aider,
 Codex users. Their Discords, subreddits and issue threads are full of people who
 already have this problem.
@@ -131,8 +131,8 @@ false positive on someone's real diff becomes the lasting impression.
 - **Apache-2.0 over MIT** — it explicitly reserves trademarks (MIT is silent) and
   carries a patent grant that enterprise legal teams look for.
 - **Trademark, not copyright, is the anti-clone protection.** Anyone can fork the
-  code under any permissive licence; what stops them shipping *Crosscheck* is
-  owning the mark. Worth registering early — but note "crosscheck" is a common
+  code under any permissive licence; what stops them shipping *Verik* is
+  owning the mark. Worth registering early — but note "verik" is a common
   English word and will be harder to defend than an invented one. Lawyer
   territory.
 - **Not BUSL/Elastic-style, yet.** Those are what companies adopt *after* they
@@ -142,7 +142,7 @@ false positive on someone's real diff becomes the lasting impression.
   costs nothing. Opening a repo nobody stars is a negative signal, not a neutral
   one.
 - **The strongest eventual argument for opening it is trust**, and it is specific
-  to this product: Crosscheck reads an entire diff and ships it to a third-party
+  to this product: Verik reads an entire diff and ships it to a third-party
   API. An auditable redaction layer is a feature, possibly the one that gets you
   through security review.
 

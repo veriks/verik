@@ -85,7 +85,7 @@ export function buildOverrideCommand(): Command {
         const info = await getRepositoryInfo(process.cwd());
         const { readFile, writeFile } = await import('node:fs/promises');
         const { join } = await import('node:path');
-        const memPath = join(info.root, '.crosscheck', 'memory.json');
+        const memPath = join(info.root, '.verik', 'memory.json');
         try {
           const raw = await readFile(memPath, 'utf8');
           const index = JSON.parse(raw) as { overrides?: Override[] };

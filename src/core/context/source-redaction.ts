@@ -1,20 +1,52 @@
 import { isExcluded } from '../repository/file-selection.js';
 
 const BINARY_EXTENSIONS = new Set([
-  '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.svg',
-  '.pdf', '.zip', '.tar', '.gz', '.woff', '.woff2', '.ttf', '.eot',
-  '.exe', '.dll', '.so', '.dylib', '.bin', '.dat',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.ico',
+  '.svg',
+  '.pdf',
+  '.zip',
+  '.tar',
+  '.gz',
+  '.woff',
+  '.woff2',
+  '.ttf',
+  '.eot',
+  '.exe',
+  '.dll',
+  '.so',
+  '.dylib',
+  '.bin',
+  '.dat',
 ]);
 
 const ALWAYS_EXCLUDED = [
-  'node_modules/**', '.git/**', '.crosscheck/runs/**', '.crosscheck/cache/**',
-  'dist/**', 'build/**', '.next/**', '__pycache__/**', '*.pyc',
-  'vendor/**', 'coverage/**', '.nyc_output/**',
+  'node_modules/**',
+  '.git/**',
+  '.verik/runs/**',
+  '.verik/cache/**',
+  'dist/**',
+  'build/**',
+  '.next/**',
+  '__pycache__/**',
+  '*.pyc',
+  'vendor/**',
+  'coverage/**',
+  '.nyc_output/**',
 ];
 
 const LOCKFILES = [
-  'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb',
-  'Pipfile.lock', 'poetry.lock', 'Cargo.lock',
+  'package-lock.json',
+  'yarn.lock',
+  'pnpm-lock.yaml',
+  'bun.lockb',
+  'Pipfile.lock',
+  'poetry.lock',
+  'Cargo.lock',
 ];
 
 export function isBinaryPath(filePath: string): boolean {

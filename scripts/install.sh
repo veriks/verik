@@ -1,8 +1,8 @@
 #!/usr/bin/env sh
 set -e
 
-REPO="crosscheck-sh/crosscheck"
-INSTALL_DIR="${CROSSCHECK_INSTALL_DIR:-/usr/local/bin}"
+REPO="verik-sh/verik"
+INSTALL_DIR="${VERIK_INSTALL_DIR:-/usr/local/bin}"
 
 # ─── detect platform ──────────────────────────────────────────────────────────
 
@@ -15,7 +15,7 @@ detect_os() {
       echo "  Windows detected."
       echo "  Install via npm instead:"
       echo ""
-      echo "    npm install -g crosscheck"
+      echo "    npm install -g verik"
       echo ""
       exit 0
       ;;
@@ -28,7 +28,7 @@ detect_arch() {
     arm64|aarch64)  echo "arm64" ;;
     *)
       echo "Unsupported architecture: $(uname -m)" >&2
-      echo "Install via npm: npm install -g crosscheck" >&2
+      echo "Install via npm: npm install -g verik" >&2
       exit 1
       ;;
   esac
@@ -36,7 +36,7 @@ detect_arch() {
 
 OS=$(detect_os)
 ARCH=$(detect_arch)
-BINARY="crosscheck-${OS}-${ARCH}"
+BINARY="verik-${OS}-${ARCH}"
 
 # ─── get version ──────────────────────────────────────────────────────────────
 
@@ -58,11 +58,11 @@ fi
 DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${VERSION}/${BINARY}"
 TMP=$(mktemp)
 
-echo "Installing crosscheck ${VERSION} (${OS}-${ARCH})..."
+echo "Installing verik ${VERSION} (${OS}-${ARCH})..."
 curl -fsSL --progress-bar "$DOWNLOAD_URL" -o "$TMP" || {
   echo "" >&2
   echo "Download failed. Binary may not exist for ${OS}-${ARCH}." >&2
-  echo "Try: npm install -g crosscheck" >&2
+  echo "Try: npm install -g verik" >&2
   exit 1
 }
 
@@ -72,22 +72,22 @@ chmod +x "$TMP"
 
 install_binary() {
   if [ -w "$INSTALL_DIR" ]; then
-    mv "$TMP" "${INSTALL_DIR}/crosscheck"
+    mv "$TMP" "${INSTALL_DIR}/verik"
   else
     echo "Installing to ${INSTALL_DIR} (requires sudo)..."
-    sudo mv "$TMP" "${INSTALL_DIR}/crosscheck"
+    sudo mv "$TMP" "${INSTALL_DIR}/verik"
   fi
 }
 
 # Try /usr/local/bin first, fall back to ~/.local/bin
 if install_binary 2>/dev/null; then
-  INSTALLED="${INSTALL_DIR}/crosscheck"
+  INSTALLED="${INSTALL_DIR}/verik"
 else
   FALLBACK="$HOME/.local/bin"
   mkdir -p "$FALLBACK"
-  mv "$TMP" "${FALLBACK}/crosscheck"
-  INSTALLED="${FALLBACK}/crosscheck"
-  echo "Installed to ${FALLBACK}/crosscheck"
+  mv "$TMP" "${FALLBACK}/verik"
+  INSTALLED="${FALLBACK}/verik"
+  echo "Installed to ${FALLBACK}/verik"
   echo "Make sure ${FALLBACK} is in your PATH:"
   echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
 fi
@@ -95,7 +95,7 @@ fi
 # ─── verify + done ────────────────────────────────────────────────────────────
 
 echo ""
-"$INSTALLED" --version && echo "" && echo "Run: crosscheck init" || {
+"$INSTALLED" --version && echo "" && echo "Run: verik init" || {
   echo "Binary installed but could not execute. Check your PATH." >&2
   exit 1
 }

@@ -1,24 +1,24 @@
-import { CrosscheckConfigSchema, PolicyConfigSchema } from './config-schema.js';
-import type { CrosscheckConfig, PolicyConfig } from './config-schema.js';
+import { VerikConfigSchema, PolicyConfigSchema } from './config-schema.js';
+import type { VerikConfig, PolicyConfig } from './config-schema.js';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ConfigError } from '../shared/errors.js';
 import { validateBuilderCommands } from '../stages/builder/command-allowlist.js';
 
-export const CROSSCHECK_DIR = '.crosscheck';
+export const VERIK_DIR = '.verik';
 
-export async function loadConfig(repoRoot: string): Promise<CrosscheckConfig> {
-  const configPath = join(repoRoot, CROSSCHECK_DIR, 'config.json');
+export async function loadConfig(repoRoot: string): Promise<VerikConfig> {
+  const configPath = join(repoRoot, VERIK_DIR, 'config.json');
   try {
     const raw = await readFile(configPath, 'utf8');
     const parsed = JSON.parse(raw) as unknown;
-    const result = CrosscheckConfigSchema.safeParse(parsed);
+    const result = VerikConfigSchema.safeParse(parsed);
     if (!result.success) {
       throw new ConfigError(`Invalid config: ${result.error.message}`);
     }
     const config = applyEnvironmentOverrides(result.data);
     // Validate extra builder commands against the allowlist.
-    // This runs at load time so `crosscheck run` fails fast with a clear message
+    // This runs at load time so `verik run` fails fast with a clear message
     // rather than executing a malicious command string mid-verification.
     if (config.builder.commands?.length) {
       validateBuilderCommands(config.builder.commands);
@@ -26,7 +26,7 @@ export async function loadConfig(repoRoot: string): Promise<CrosscheckConfig> {
     return config;
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      return applyEnvironmentOverrides(CrosscheckConfigSchema.parse({ version: 1 }));
+      return applyEnvironmentOverrides(VerikConfigSchema.parse({ version: 1 }));
     }
     if (err instanceof ConfigError) throw err;
     throw new ConfigError(`Failed to read config: ${String(err)}`);
@@ -34,7 +34,7 @@ export async function loadConfig(repoRoot: string): Promise<CrosscheckConfig> {
 }
 
 export async function loadPolicy(repoRoot: string): Promise<PolicyConfig> {
-  const policyPath = join(repoRoot, CROSSCHECK_DIR, 'policy.json');
+  const policyPath = join(repoRoot, VERIK_DIR, 'policy.json');
   try {
     const raw = await readFile(policyPath, 'utf8');
     const parsed = JSON.parse(raw) as unknown;
@@ -65,14 +65,14 @@ export async function savePolicy(repoRoot: string, policy: PolicyConfig): Promis
   if (!result.success) {
     throw new ConfigError(`Refusing to write an invalid policy: ${result.error.message}`);
   }
-  const policyPath = join(repoRoot, CROSSCHECK_DIR, 'policy.json');
-  await mkdir(join(repoRoot, CROSSCHECK_DIR), { recursive: true });
+  const policyPath = join(repoRoot, VERIK_DIR, 'policy.json');
+  await mkdir(join(repoRoot, VERIK_DIR), { recursive: true });
   await writeFile(policyPath, `${JSON.stringify(result.data, null, 2)}\n`, 'utf8');
 }
 
-function applyEnvironmentOverrides(config: CrosscheckConfig): CrosscheckConfig {
-  const scout = process.env['CROSSCHECK_MODEL_SCOUT'] ?? config.models.scout;
-  const reviewer = process.env['CROSSCHECK_MODEL_REVIEWER'] ?? config.models.reviewer;
-  const judge = process.env['CROSSCHECK_MODEL_JUDGE'] ?? config.models.judge;
+function applyEnvironmentOverrides(config: VerikConfig): VerikConfig {
+  const scout = process.env['VERIK_MODEL_SCOUT'] ?? config.models.scout;
+  const reviewer = process.env['VERIK_MODEL_REVIEWER'] ?? config.models.reviewer;
+  const judge = process.env['VERIK_MODEL_JUDGE'] ?? config.models.judge;
   return { ...config, models: { scout, reviewer, judge } };
 }

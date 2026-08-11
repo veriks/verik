@@ -66,7 +66,7 @@ export function buildVerifyCommand(): Command {
           console.error(
             `${warn('!')} Checkpoint from ${checkpoint.branch}@${checkpoint.commitSha.slice(0, 8)} is not an ancestor of HEAD — diffing against HEAD instead.`,
           );
-          console.error(subtle('  Run crosscheck begin again to re-baseline.'));
+          console.error(subtle('  Run verik begin again to re-baseline.'));
         }
         const usable = checkpoint && !stale ? checkpoint : null;
 
@@ -108,7 +108,7 @@ export function buildVerifyCommand(): Command {
           repositoryRemote: info.remote,
           branch: info.branch,
           baselineCommitSha: info.commitSha,
-          wrappedCommand: ['crosscheck', 'verify'],
+          wrappedCommand: ['verik', 'verify'],
           baselineSnapshot: snapshot,
           repositoryDirtyBefore: info.isDirty,
         });
@@ -136,7 +136,7 @@ export function buildVerifyCommand(): Command {
           repoId: fingerprint.repoId,
           config,
           policy,
-          wrappedCommand: ['crosscheck', 'verify'],
+          wrappedCommand: ['verik', 'verify'],
           intent: flags.intent,
           baselineSnapshot: snapshot,
           finalSnapshot: snapshot,

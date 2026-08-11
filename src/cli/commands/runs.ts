@@ -28,7 +28,7 @@ export function buildRunsCommand(): Command {
         const ids = await listRunIds(info.root);
 
         if (ids.length === 0) {
-          console.log('No runs found. Try: crosscheck run -- <command>');
+          console.log('No runs found. Try: verik run -- <command>');
           return;
         }
 

@@ -6,7 +6,7 @@ export function renderReport(context: RunContext, pipeline: PipelineResult): str
   const { record, diff } = context;
   const lines: string[] = [];
 
-  lines.push(`# Crosscheck Report`);
+  lines.push(`# Verik Report`);
   lines.push(`\n**Run:** ${record.runId}`);
   lines.push(`**Generated:** ${new Date().toISOString()}`);
 
@@ -161,7 +161,7 @@ export function renderReport(context: RunContext, pipeline: PipelineResult): str
 
   lines.push(`\n---`);
   lines.push(
-    `*Crosscheck is an early verification system. It is not a guarantee of correctness or security.*`,
+    `*Verik is an early verification system. It is not a guarantee of correctness or security.*`,
   );
 
   return lines.join('\n') + '\n';

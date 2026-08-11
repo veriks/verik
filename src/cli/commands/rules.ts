@@ -8,7 +8,7 @@ import type { PolicyConfig } from '../../config/config-schema.js';
 import type { Severity } from '../../shared/schemas.js';
 
 /**
- * `crosscheck rules` — see and tune the deterministic rules.
+ * `verik rules` — see and tune the deterministic rules.
  *
  * Two levers, and the order they appear in the help matters. `severity` keeps a
  * finding in the report while stopping it blocking, so nothing is lost;
@@ -92,10 +92,10 @@ export function buildRulesCommand(): Command {
         );
         if (offCount) console.log(`  ${muted(`${offCount} disabled`)}`);
         console.log(
-          `\n    ${brand('crosscheck rules severity <id> <level>')}${muted('   keep it, stop it blocking')}`,
+          `\n    ${brand('verik rules severity <id> <level>')}${muted('   keep it, stop it blocking')}`,
         );
         console.log(
-          `    ${brand('crosscheck rules disable <id> --reason "…"')}${muted('   turn it off')}\n`,
+          `    ${brand('verik rules disable <id> --reason "…"')}${muted('   turn it off')}\n`,
         );
       } catch (err) {
         console.error(`${block('✕')} ${formatError(err)}`);
@@ -158,7 +158,7 @@ export function buildRulesCommand(): Command {
         console.log(`\n  ${pass('✓')} ${bold(id)} ${muted('disabled')}`);
         console.log(`  ${subtle(`reason: ${options.reason}`)}`);
         console.log(
-          `  ${subtle('recorded in .crosscheck/policy.json — it will show up in your next pull request')}\n`,
+          `  ${subtle('recorded in .verik/policy.json — it will show up in your next pull request')}\n`,
         );
       } catch (err) {
         console.error(`${block('✕')} ${formatError(err)}`);

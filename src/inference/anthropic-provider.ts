@@ -170,7 +170,7 @@ export class AnthropicProvider implements LlmProvider {
         }
         if (err instanceof Anthropic.NotFoundError) {
           throw new ProviderError(
-            `Model not found: "${this.resolveModel(request.model, request.stage)}" — check CROSSCHECK_MODEL_${request.stage.toUpperCase()} or the config file.`,
+            `Model not found: "${this.resolveModel(request.model, request.stage)}" — check VERIK_MODEL_${request.stage.toUpperCase()} or the config file.`,
           );
         }
         if (isAbortError(err)) {
@@ -206,15 +206,15 @@ export class AnthropicProvider implements LlmProvider {
   }
 
   /**
-   * Precedence: CROSSCHECK_MODEL_<STAGE> env var, then config.json, then the
+   * Precedence: VERIK_MODEL_<STAGE> env var, then config.json, then the
    * per-stage default.
    *
    * 'configured-through-environment' is a legacy placeholder written by older
-   * versions of `crosscheck init`; treat it as "unset" so existing config files
+   * versions of `verik init`; treat it as "unset" so existing config files
    * keep working.
    */
   private resolveModel(modelConfig: string, stage: string): string {
-    const fromEnv = process.env[`CROSSCHECK_MODEL_${stage.toUpperCase()}`];
+    const fromEnv = process.env[`VERIK_MODEL_${stage.toUpperCase()}`];
     if (fromEnv) return fromEnv;
     if (modelConfig && modelConfig !== 'configured-through-environment') return modelConfig;
     return DEFAULT_MODELS[stage as keyof typeof DEFAULT_MODELS] ?? DEFAULT_MODELS.reviewer;

@@ -8,7 +8,7 @@ import type { RunStatus, StageRunStatus } from './run-state.js';
  * two false-green failure modes:
  *
  *  - A policy verdict discarded the wrapped command's own exit code, so
- *    `crosscheck run -- npm test` with failing tests exited 0 in advisory mode.
+ *    `verik run -- npm test` with failing tests exited 0 in advisory mode.
  *  - With no API key every LLM stage failed, so there was no policy at all, and
  *    the fallback returned the command's 0 while the run was still recorded as
  *    `completed` — reporting success for verification that never happened.
@@ -68,7 +68,7 @@ export function resolveExit(inputs: ExitInputs): ExitDecision {
     };
   }
 
-  // A policy block is the strongest statement Crosscheck can make: do not ship
+  // A policy block is the strongest statement Verik can make: do not ship
   // this. It outranks the wrapped command's own code.
   if (policy && policy.exitCode === 2) {
     return { exitCode: 2, status: 'completed' };
@@ -90,7 +90,7 @@ export function resolveExit(inputs: ExitInputs): ExitDecision {
   }
 
   // Verification did not reach a verdict. Advisory promises never to fail a
-  // build on Crosscheck's opinion, so it stays 0 — but the run is recorded as
+  // build on Verik's opinion, so it stays 0 — but the run is recorded as
   // inconclusive rather than completed, and the user is told.
   return {
     exitCode: policyMode === 'blocking' ? 3 : 0,

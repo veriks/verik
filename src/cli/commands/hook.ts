@@ -12,7 +12,7 @@ import {
 } from '../../core/hooks/git-hooks.js';
 
 /**
- * `crosscheck hook` — put verification in front of `git commit`.
+ * `verik hook` — put verification in front of `git commit`.
  *
  * Everything else in this CLI has to be remembered. This is the one command
  * that makes the rest run on their own.
@@ -33,7 +33,7 @@ function describe(root: string, status: HookStatus): string[] {
         status.state === 'installed'
           ? 'installed'
           : status.state === 'foreign'
-            ? 'another hook is present, crosscheck is not in it'
+            ? 'another hook is present, verik is not in it'
             : 'not installed',
       state:
         status.state === 'installed'
@@ -59,14 +59,14 @@ function describe(root: string, status: HookStatus): string[] {
 
 export function buildHookCommand(): Command {
   const cmd = new Command('hook').description(
-    'Install crosscheck as a git pre-commit hook, so verification runs on its own',
+    'Install verik as a git pre-commit hook, so verification runs on its own',
   );
 
   cmd
     .command('install')
-    .description('Add crosscheck to the pre-commit hook, preserving any hook already there')
+    .description('Add verik to the pre-commit hook, preserving any hook already there')
     .option('--mode <mode>', 'Verification mode to run in the hook: rules or full', 'rules')
-    .option('--prepend', 'Run crosscheck before the existing hook rather than after')
+    .option('--prepend', 'Run verik before the existing hook rather than after')
     .action(async (options: { mode: string; prepend?: boolean }) => {
       try {
         const info = await getRepositoryInfo(process.cwd());
@@ -88,7 +88,7 @@ export function buildHookCommand(): Command {
               ? [
                   {
                     label: 'existing hook',
-                    detail: `preserved, crosscheck runs ${result.position === 'prepend' ? 'first' : 'after it'}`,
+                    detail: `preserved, verik runs ${result.position === 'prepend' ? 'first' : 'after it'}`,
                   },
                 ]
               : []),
@@ -108,9 +108,7 @@ export function buildHookCommand(): Command {
 
         console.log(`\n  ${muted('From now on every commit is verified.')}`);
         console.log(`    ${brand('git commit --no-verify')}${muted('   skip it once')}`);
-        console.log(
-          `    ${brand('crosscheck hook uninstall')}${muted('   remove it completely')}\n`,
-        );
+        console.log(`    ${brand('verik hook uninstall')}${muted('   remove it completely')}\n`);
       } catch (err) {
         console.error(`${block('✕')} ${formatError(err)}`);
         process.exit(1);
@@ -119,21 +117,21 @@ export function buildHookCommand(): Command {
 
   cmd
     .command('uninstall')
-    .description('Remove crosscheck from the pre-commit hook, leaving any other hook intact')
+    .description('Remove verik from the pre-commit hook, leaving any other hook intact')
     .action(async () => {
       try {
         const info = await getRepositoryInfo(process.cwd());
         const result = await uninstallHook(info.root);
 
         if (!result.removed) {
-          console.log(`\n  ${muted('No crosscheck hook was installed — nothing to remove.')}\n`);
+          console.log(`\n  ${muted('No verik hook was installed — nothing to remove.')}\n`);
           return;
         }
 
         console.log(`\n  ${pass('✓')} ${muted('pre-commit hook removed')}`);
         if (result.restoredForeignContent) {
           console.log(
-            `  ${subtle(`the hook that was there before crosscheck is intact at ${shown(info.root, result.target.path)}`)}`,
+            `  ${subtle(`the hook that was there before verik is intact at ${shown(info.root, result.target.path)}`)}`,
           );
         }
         console.log();
@@ -143,7 +141,7 @@ export function buildHookCommand(): Command {
       }
     });
 
-  // Bare `crosscheck hook` reports rather than mutates. Installing a hook is a
+  // Bare `verik hook` reports rather than mutates. Installing a hook is a
   // change to how someone's git behaves and should always be asked for.
   cmd.action(async () => {
     try {
@@ -155,9 +153,9 @@ export function buildHookCommand(): Command {
 
       if (status.state !== 'installed') {
         console.log(`\n  ${muted('Run verification on every commit:')}`);
-        console.log(`    ${brand('crosscheck hook install')}\n`);
+        console.log(`    ${brand('verik hook install')}\n`);
       } else {
-        console.log(`\n    ${brand('crosscheck hook uninstall')}${muted('   remove it')}\n`);
+        console.log(`\n    ${brand('verik hook uninstall')}${muted('   remove it')}\n`);
       }
     } catch (err) {
       console.error(`${block('✕')} ${formatError(err)}`);

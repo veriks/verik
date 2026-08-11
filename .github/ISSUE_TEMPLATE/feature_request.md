@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest an improvement or new capability for Crosscheck
+about: Suggest an improvement or new capability for Verik
 title: "[Feature] "
 labels: enhancement
 assignees: ''

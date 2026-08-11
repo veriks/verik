@@ -1,14 +1,9 @@
 import { Command } from 'commander';
 import { orchestrateRun } from '../../core/run/run-orchestrator.js';
 import { getRepositoryInfo } from '../../core/repository/git-repository.js';
-import {
-  printCommand,
-  printVerdictSummary,
-  printError,
-  printJson,
-} from '../output/terminal.js';
+import { printCommand, printVerdictSummary, printError, printJson } from '../output/terminal.js';
 import { setVerbose } from '../../shared/logger.js';
-import { CrosscheckError } from '../../shared/errors.js';
+import { VerikError } from '../../shared/errors.js';
 import type { RunFlags } from '../../core/run/run-context.js';
 
 export function buildRunCommand(): Command {
@@ -63,7 +58,7 @@ export function buildRunCommand(): Command {
 
         process.exit(result.exitCode);
       } catch (err) {
-        if (err instanceof CrosscheckError) {
+        if (err instanceof VerikError) {
           if (!flags.quiet) printError(err.message);
           process.exit(err.exitCode);
         }

@@ -45,5 +45,5 @@ Use the `FakeProvider` for tests — no real API calls in the default suite.
 
 Please include:
 - The command you ran
-- The relevant part of `.crosscheck/runs/<id>/report.md`
+- The relevant part of `.verik/runs/<id>/report.md`
 - The error message or unexpected behavior

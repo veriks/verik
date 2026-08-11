@@ -61,7 +61,7 @@ export function buildInspectCommand(): Command {
           return;
         }
 
-        console.log(head(`\nCrosscheck Inspect`));
+        console.log(head(`\nVerik Inspect`));
         console.log(dim(`Run: ${id}`));
         if (metadata) {
           console.log(dim(`Repo: ${metadata.repoId ?? 'unknown'} — ${metadata.repositoryPath}`));

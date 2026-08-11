@@ -20,7 +20,7 @@ const red = (s: string) => (c() ? chalk.red(s) : s);
 
 export function buildDryRunCommand(): Command {
   return new Command('dry-run')
-    .description('Preview what crosscheck run would do — no subprocess, no LLM calls')
+    .description('Preview what verik run would do — no subprocess, no LLM calls')
     .argument('<command...>', 'Command that would be run (after --)')
     .option('--intent <text>', 'User intent description')
     .action(async (commandArgs: string[], _options: { intent?: string }) => {
@@ -35,7 +35,7 @@ export function buildDryRunCommand(): Command {
         ]);
         const policy = await loadPolicy(root);
 
-        console.log(bold('\nCrosscheck Dry Run'));
+        console.log(bold('\nVerik Dry Run'));
         console.log(dim(`Would run: ${commandArgs.join(' ')}\n`));
 
         // Repository state

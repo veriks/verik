@@ -10,7 +10,7 @@ export interface RepoFingerprint {
   rootPath: string;
 }
 
-const FINGERPRINT_FILE = '.crosscheck/repo.json';
+const FINGERPRINT_FILE = '.verik/repo.json';
 
 /**
  * A stable identity for this repository.
@@ -43,7 +43,7 @@ export async function getOrCreateFingerprint(
   };
 
   try {
-    await mkdir(join(rootPath, '.crosscheck'), { recursive: true });
+    await mkdir(join(rootPath, '.verik'), { recursive: true });
     await writeFile(path, JSON.stringify(fingerprint, null, 2), 'utf8');
   } catch (err) {
     logger.warn(`Could not persist repo fingerprint: ${String(err)}`);

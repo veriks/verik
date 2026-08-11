@@ -4,7 +4,7 @@ import { Command } from 'commander';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { getRepositoryInfo } from '../../core/repository/git-repository.js';
-import { CrosscheckError } from '../../shared/errors.js';
+import { VerikError } from '../../shared/errors.js';
 import { DEFAULT_CONFIG, DEFAULT_POLICY, DEFAULT_MODELS } from '../../config/defaults.js';
 import { getOrCreateFingerprint } from '../../core/repository/repo-fingerprint.js';
 import {
@@ -50,14 +50,14 @@ interface Setup {
  */
 export function buildInitCommand(): Command {
   return new Command('init')
-    .description('Set up Crosscheck in the current repository')
+    .description('Set up Verik in the current repository')
     .option('-y, --yes', 'Accept defaults without prompting (for CI and scripts)')
     .option('--provider <id>', 'Inference provider (skips the prompt)')
     .option('--mode <mode>', 'rules | full')
     .action(async (options: { yes?: boolean; provider?: string; mode?: string }) => {
       try {
         const info = await getRepositoryInfo(process.cwd());
-        const ccDir = join(info.root, '.crosscheck');
+        const ccDir = join(info.root, '.verik');
         const interactive = isInteractive() && !options.yes;
 
         if (interactive) console.log(banner());
@@ -100,8 +100,8 @@ export function buildInitCommand(): Command {
         console.log(`\n  ${section('written')}`);
         await reveal(
           checklist([
-            { label: 'config', detail: '.crosscheck/config.json' },
-            { label: 'policy', detail: `.crosscheck/policy.json · ${DEFAULT_POLICY.mode}` },
+            { label: 'config', detail: '.verik/config.json' },
+            { label: 'policy', detail: `.verik/policy.json · ${DEFAULT_POLICY.mode}` },
             { label: 'repo id', detail: fingerprint.repoId },
           ]),
         );
@@ -112,7 +112,7 @@ export function buildInitCommand(): Command {
           console.log(subtle('\n  Cancelled. Nothing was written.\n'));
           process.exit(130);
         }
-        if (err instanceof CrosscheckError) {
+        if (err instanceof VerikError) {
           console.error('Error:', err.message);
           process.exit(err.exitCode);
         }
@@ -193,7 +193,7 @@ async function collectSetup(
     flagMode ??
     (await select<Mode>({
       header: stepHeader(mark(), 1, 2),
-      question: 'How much should Crosscheck do?',
+      question: 'How much should Verik do?',
       choices: [
         {
           value: 'full',
@@ -298,9 +298,9 @@ async function printSummary(setup: Setup): Promise<void> {
   console.log(`\n  ${section('try')}`);
   await reveal(
     [
-      `  ${brand('crosscheck verify')}${muted('          check your uncommitted changes')}`,
-      `  ${brand('crosscheck run -- <cmd>')}${muted('    wrap a coding agent')}`,
-      `  ${brand('crosscheck demo')}${muted('            see a full fake run')}`,
+      `  ${brand('verik verify')}${muted('          check your uncommitted changes')}`,
+      `  ${brand('verik run -- <cmd>')}${muted('    wrap a coding agent')}`,
+      `  ${brand('verik demo')}${muted('            see a full fake run')}`,
     ],
     40,
   );

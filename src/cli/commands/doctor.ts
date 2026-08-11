@@ -37,7 +37,7 @@ async function check(
 
 export function buildDoctorCommand(): Command {
   return new Command('doctor')
-    .description('Validate Crosscheck configuration and connectivity before running')
+    .description('Validate Verik configuration and connectivity before running')
     .option('--json', 'Machine-readable output')
     .action(async (options: { json?: boolean }) => {
       let repoRoot: string;
@@ -45,7 +45,7 @@ export function buildDoctorCommand(): Command {
         const info = await getRepositoryInfo(process.cwd());
         repoRoot = info.root;
       } catch {
-        if (!options.json) console.error(err('Not a git repository — crosscheck requires git.'));
+        if (!options.json) console.error(err('Not a git repository — verik requires git.'));
         else console.log(JSON.stringify({ ok: false, error: 'not-a-git-repo' }));
         process.exit(1);
       }
@@ -55,14 +55,14 @@ export function buildDoctorCommand(): Command {
       // 1. Git repo
       results.push(await check('Git repository detected', async () => 'ok'));
 
-      // 2. .crosscheck directory
+      // 2. .verik directory
       results.push(
-        await check('.crosscheck/ directory exists', async () => {
+        await check('.verik/ directory exists', async () => {
           try {
-            await access(join(repoRoot, '.crosscheck'));
+            await access(join(repoRoot, '.verik'));
             return 'ok';
           } catch {
-            return { warn: 'run `crosscheck init` to create it' };
+            return { warn: 'run `verik init` to create it' };
           }
         }),
       );
@@ -153,7 +153,7 @@ export function buildDoctorCommand(): Command {
                 } catch (e) {
                   if (e instanceof Anthropic.NotFoundError) {
                     return {
-                      fail: `Model "${model}" not found — check CROSSCHECK_MODEL_${stage.toUpperCase()} or config.json`,
+                      fail: `Model "${model}" not found — check VERIK_MODEL_${stage.toUpperCase()} or config.json`,
                     };
                   }
                   if (e instanceof Anthropic.AuthenticationError) {

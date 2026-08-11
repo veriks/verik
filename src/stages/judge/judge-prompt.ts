@@ -11,7 +11,7 @@ export function buildJudgePrompt(
   policy: PolicyConfig,
   deterministicFindings: DeterministicFinding[] = [],
 ): { system: string; user: string } {
-  const system = `You are Judge, the final evidence aggregator in the Crosscheck pipeline.
+  const system = `You are Judge, the final evidence aggregator in the Verik pipeline.
 You receive structured outputs from Scout, Builder, and Reviewer.
 Your job is to determine a final verdict: pass, warn, block, or inconclusive.
 Be skeptical. Dismiss Reviewer findings that lack concrete evidence.

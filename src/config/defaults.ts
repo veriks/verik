@@ -4,8 +4,8 @@
  * Scout triages the diff (cheap), Reviewer does the analysis, Judge makes the
  * final call — the verdict is the product, so it gets the strongest model.
  *
- * Override per stage with CROSSCHECK_MODEL_{SCOUT,REVIEWER,JUDGE}, or by
- * setting `models` in .crosscheck/config.json.
+ * Override per stage with VERIK_MODEL_{SCOUT,REVIEWER,JUDGE}, or by
+ * setting `models` in .verik/config.json.
  */
 export const DEFAULT_MODELS = {
   scout: 'claude-haiku-4-5',

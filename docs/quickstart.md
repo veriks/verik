@@ -1,6 +1,6 @@
-# Trying Crosscheck on a real repository
+# Trying Verik on a real repository
 
-Crosscheck tells you **which lines your AI agent wrote, and whether they're safe
+Verik tells you **which lines your AI agent wrote, and whether they're safe
 to ship** — separately from your own uncommitted work, without touching your
 repository.
 
@@ -16,8 +16,8 @@ early.
 ## 1. Install
 
 ```sh
-git clone https://github.com/crosscheck-sh/crosscheck.git
-cd crosscheck
+git clone https://github.com/verik-sh/verik.git
+cd verik
 pnpm install
 pnpm build
 npm link
@@ -26,12 +26,12 @@ npm link
 Check it worked:
 
 ```sh
-crosscheck --version
+verik --version
 ```
 
-You should see `0.1.0`. If `crosscheck` isn't found, your npm global bin isn't on
-`PATH` — you can skip `npm link` and use `node /path/to/crosscheck/dist/index.js`
-anywhere you'd type `crosscheck` below.
+You should see `0.1.0`. If `verik` isn't found, your npm global bin isn't on
+`PATH` — you can skip `npm link` and use `node /path/to/verik/dist/index.js`
+anywhere you'd type `verik` below.
 
 > No pnpm? `npm install -g pnpm`, or use `npm install && npm run build` instead.
 
@@ -44,7 +44,7 @@ case this tool exists for.
 
 ```sh
 cd ~/code/your-project
-crosscheck init --yes --mode rules
+verik init --yes --mode rules
 ```
 
 `--mode rules` runs the 23 deterministic checks only: local regex passes, no LLM,
@@ -58,10 +58,10 @@ It prints what it detected:
 ```
 
 **Check that line.** Those are the commands it will run to see whether your
-project still builds. If it guessed wrong, fix it in `.crosscheck/config.json`
+project still builds. If it guessed wrong, fix it in `.verik/config.json`
 under `builder.commands`.
 
-It creates a `.crosscheck/` directory. Nothing else in your repo is touched.
+It creates a `.verik/` directory. Nothing else in your repo is touched.
 
 ---
 
@@ -74,10 +74,10 @@ Pick whichever matches how you actually use AI.
 Claude Code, Codex, Aider, Amp — anything you launch as a command:
 
 ```sh
-crosscheck run -- claude -p "add rate limiting to the API"
+verik run -- claude -p "add rate limiting to the API"
 ```
 
-Crosscheck snapshots your repo, runs the agent, snapshots again, and reports on
+Verik snapshots your repo, runs the agent, snapshots again, and reports on
 **only what the agent changed** — even if you had uncommitted work in the same
 files when you started.
 
@@ -87,13 +87,13 @@ Cursor, Copilot, the Claude or ChatGPT desktop app, or code you pasted in. There
 no process to wrap, so mark the line yourself:
 
 ```sh
-crosscheck begin
+verik begin
 ```
 
 Now let the agent work. When it's done:
 
 ```sh
-crosscheck verify
+verik verify
 ```
 
 `begin` records where you were. `verify` compares against that point, not against
@@ -125,11 +125,11 @@ exits 0. If you were expecting it to stop something, that's why.
 When you're ready for it to actually gate:
 
 ```sh
-crosscheck policy mode blocking
+verik policy mode blocking
 ```
 
 Now a finding at `high` or above exits **2**. Check the current setting any time
-with `crosscheck policy`.
+with `verik policy`.
 
 ---
 
@@ -138,7 +138,7 @@ with `crosscheck policy`.
 Verification you have to remember isn't verification.
 
 ```sh
-crosscheck hook install
+verik hook install
 ```
 
 Every `git commit` now runs the deterministic rules first. Specifically:
@@ -146,14 +146,14 @@ Every `git commit` now runs the deterministic rules first. Specifically:
 - It's **silent when clean** — no noise on a normal commit.
 - It **preserves any hook you already have.** husky, lint-staged, pre-commit —
   all keep working, and a backup is saved.
-- It **can't break your git.** If crosscheck itself fails or isn't installed, your
+- It **can't break your git.** If verik itself fails or isn't installed, your
   commit goes through with a warning. Only a real policy decision stops you.
 - Escape hatch for a single commit: `git commit --no-verify`.
 
 Remove it completely at any time — this restores your original hook byte-for-byte:
 
 ```sh
-crosscheck hook uninstall
+verik hook uninstall
 ```
 
 ---
@@ -165,23 +165,23 @@ It will. This is the part we most want to hear about.
 See everything it checks:
 
 ```sh
-crosscheck rules
+verik rules
 ```
 
 Then pick a lever. **Prefer the first one** — the finding stays visible in your
 report and only stops blocking, so you lose no information:
 
 ```sh
-crosscheck rules severity debug-artifact info
+verik rules severity debug-artifact info
 ```
 
 If a rule genuinely doesn't apply to your project:
 
 ```sh
-crosscheck rules disable type-escape --reason "generated protobuf bindings"
+verik rules disable type-escape --reason "generated protobuf bindings"
 ```
 
-`--reason` is required on purpose. It's written into `.crosscheck/policy.json`,
+`--reason` is required on purpose. It's written into `.verik/policy.json`,
 which is committed — so turning a check off shows up in your next pull request
 instead of quietly happening.
 
@@ -191,7 +191,7 @@ in the run record. Switching something off never hides it without a trace.
 To silence one specific finding rather than a whole rule:
 
 ```sh
-crosscheck override add --rule secret-leak --path tests/fixtures.ts --reason "test data"
+verik override add --rule secret-leak --path tests/fixtures.ts --reason "test data"
 ```
 
 ---
@@ -199,13 +199,13 @@ crosscheck override add --rule secret-leak --path tests/fixtures.ts --reason "te
 ## 7. Reading the results
 
 ```sh
-crosscheck report        # the full report
-crosscheck explain       # the verdict in plain English
-crosscheck runs          # every run so far
-crosscheck inspect       # what was sent, what was excluded, token usage
+verik report        # the full report
+verik explain       # the verdict in plain English
+verik runs          # every run so far
+verik inspect       # what was sent, what was excluded, token usage
 ```
 
-Reports live in `.crosscheck/runs/<run-id>/`, which is gitignored.
+Reports live in `.verik/runs/<run-id>/`, which is gitignored.
 
 ---
 
@@ -214,7 +214,7 @@ Reports live in `.crosscheck/runs/<run-id>/`, which is gitignored.
 Your CI checkout is clean, so point it at a commit range instead:
 
 ```sh
-crosscheck verify --base origin/main
+verik verify --base origin/main
 ```
 
 Exit codes:
@@ -222,7 +222,7 @@ Exit codes:
 | Code | Meaning |
 |---|---|
 | `0` | Passed, or the policy chose not to block |
-| `1` | Crosscheck itself failed |
+| `1` | Verik itself failed |
 | `2` | **Policy blocked** — do not ship |
 | `3` | Blocking mode, but verification couldn't reach a verdict |
 
@@ -233,12 +233,12 @@ See [ci.md](ci.md) for a full GitHub Actions example.
 ## 9. Backing out
 
 ```sh
-crosscheck hook uninstall     # restores your original hook exactly
-rm -rf .crosscheck            # removes all config and history
-npm unlink -g crosscheck      # removes the binary
+verik hook uninstall     # restores your original hook exactly
+rm -rf .verik            # removes all config and history
+npm unlink -g verik      # removes the binary
 ```
 
-Your repository is otherwise untouched — Crosscheck never stages, stashes,
+Your repository is otherwise untouched — Verik never stages, stashes,
 commits, or checks anything out. That's a design invariant, not a promise.
 
 ---
@@ -256,10 +256,10 @@ send it.
 
 Also worth reporting:
 
-- `crosscheck init` guessing your build commands wrong
+- `verik init` guessing your build commands wrong
 - Anything that felt slow
 - Any case where it blocked something it shouldn't have, or missed something obvious
 
 Open an issue at
-[github.com/crosscheck-sh/crosscheck/issues](https://github.com/crosscheck-sh/crosscheck/issues),
-or just paste the output of `crosscheck report`.
+[github.com/verik-sh/verik/issues](https://github.com/verik-sh/verik/issues),
+or just paste the output of `verik report`.

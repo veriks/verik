@@ -83,7 +83,7 @@ export async function buildAndSaveReport(
 
   // Individual stage files carry both output and full inference metadata —
   // model, provider, promptVersion, promptHash, inputHash, token usage, duration.
-  // crosscheck inspect reads these directly.
+  // verik inspect reads these directly.
   const sm = pipeline.stageMetadata;
   if (pipeline.scout)
     await saveRunJson(repoRoot, runId, 'scout.json', { ...sm.scout, output: pipeline.scout });

@@ -1,4 +1,4 @@
-# Crosscheck — Technical Reference
+# Verik — Technical Reference
 
 Complete reference for the CLI, the architecture, and the invariants that must
 not be broken. Written to be enough for someone (or another agent) to pick the
@@ -15,7 +15,7 @@ An independent verification runtime for AI-generated code. It answers one
 question a passing CI run cannot: **which lines did the agent write, and are
 they safe to ship?**
 
-The differentiated part is not "AI code review" — it is *attribution*. Crosscheck
+The differentiated part is not "AI code review" — it is *attribution*. Verik
 can separate the agent's changes from the developer's own uncommitted work, in a
 dirty repository, without mutating that repository. Everything else is built on
 that.
@@ -49,14 +49,14 @@ in a pre-commit hook.
 ### Setup
 
 ```sh
-crosscheck init [--yes] [--mode rules|full]
+verik init [--yes] [--mode rules|full]
 ```
-Creates `.crosscheck/` with `config.json`, `policy.json`, `repo.json`. Interactive
+Creates `.verik/` with `config.json`, `policy.json`, `repo.json`. Interactive
 arrow-key onboarding unless `--yes`. Works in a repository with an unborn HEAD
 (`git init` with no commits) — that is a supported state, not an error.
 
 ```sh
-crosscheck doctor
+verik doctor
 ```
 Environment diagnostics: git version, node version, API key presence, config
 validity.
@@ -64,14 +64,14 @@ validity.
 ### Verifying
 
 ```sh
-crosscheck run -- <command...>          # wrap an agent, attribute what it changed
-crosscheck run -- claude -p "add OAuth"
-crosscheck run -- codex
-crosscheck run -- aider
+verik run -- <command...>          # wrap an agent, attribute what it changed
+verik run -- claude -p "add OAuth"
+verik run -- codex
+verik run -- aider
 ```
 
 ```sh
-crosscheck verify [options]             # verify the current uncommitted diff
+verik verify [options]             # verify the current uncommitted diff
   --json                                # machine-readable
   --quiet                               # suppress output
   --intent <text>                       # what the change was meant to do
@@ -80,7 +80,7 @@ crosscheck verify [options]             # verify the current uncommitted diff
 ```
 
 ```sh
-crosscheck dry-run -- <command...>      # preview: no subprocess, no LLM calls
+verik dry-run -- <command...>      # preview: no subprocess, no LLM calls
 ```
 
 ### Agents that cannot be wrapped
@@ -89,10 +89,10 @@ Cursor, Copilot, the Claude or ChatGPT desktop apps — anything where code
 arrives by paste and there is no process to wrap.
 
 ```sh
-crosscheck begin            # mark the current tree as the baseline
+verik begin            # mark the current tree as the baseline
 # ...let the agent work...
-crosscheck verify           # diffs against the checkpoint, not HEAD
-crosscheck begin --clear    # discard the checkpoint
+verik verify           # diffs against the checkpoint, not HEAD
+verik begin --clear    # discard the checkpoint
 ```
 
 A checkpoint is **stale** if the branch or commit has changed since it was
@@ -101,35 +101,35 @@ taken; `verify` warns and falls back to HEAD rather than reporting nonsense.
 ### Git hook
 
 ```sh
-crosscheck hook                 # status (does not mutate anything)
-crosscheck hook install         # add to pre-commit
+verik hook                 # status (does not mutate anything)
+verik hook install         # add to pre-commit
   --mode rules|full             # default: rules
   --prepend                     # run before the existing hook rather than after
-crosscheck hook uninstall       # remove, restoring the file byte-for-byte
+verik hook uninstall       # remove, restoring the file byte-for-byte
 ```
 
 ### Tuning
 
 ```sh
-crosscheck rules                                    # list all 23 + effective severity
-crosscheck rules --json
-crosscheck rules severity <id> <info|low|medium|high|critical>
-crosscheck rules disable <id> --reason "<text>"     # --reason is mandatory
-crosscheck rules enable <id>
+verik rules                                    # list all 23 + effective severity
+verik rules --json
+verik rules severity <id> <info|low|medium|high|critical>
+verik rules disable <id> --reason "<text>"     # --reason is mandatory
+verik rules enable <id>
 ```
 
 ```sh
-crosscheck policy                                   # show what is in force
-crosscheck policy --json
-crosscheck policy mode <shadow|advisory|blocking>
-crosscheck policy block-at <severity>
+verik policy                                   # show what is in force
+verik policy --json
+verik policy mode <shadow|advisory|blocking>
+verik policy block-at <severity>
 ```
 
 ```sh
-crosscheck override add --rule <id> [--path <file>] [--title <regex>]
+verik override add --rule <id> [--path <file>] [--title <regex>]
                         --reason <text> [--expires <ISO-date>]
-crosscheck override list [--json]
-crosscheck override remove <override-id>
+verik override list [--json]
+verik override remove <override-id>
 ```
 
 **Which lever to use:**
@@ -147,13 +147,13 @@ crossing the blocking threshold, so no information is lost.
 ### Reading results
 
 ```sh
-crosscheck report [run-id]      # full report
-crosscheck explain [run-id]     # the verdict in plain English
-crosscheck runs [--limit n] [--verdict pass|warn|block|inconclusive] [--json]
-crosscheck inspect [run-id] [--prompt] [--json]   # context, tokens, stage identity
-crosscheck status
-crosscheck config
-crosscheck demo                 # exercises the whole pipeline, no network
+verik report [run-id]      # full report
+verik explain [run-id]     # the verdict in plain English
+verik runs [--limit n] [--verdict pass|warn|block|inconclusive] [--json]
+verik inspect [run-id] [--prompt] [--json]   # context, tokens, stage identity
+verik status
+verik config
+verik demo                 # exercises the whole pipeline, no network
 ```
 
 ---
@@ -165,7 +165,7 @@ This contract is load-bearing. `src/core/run/exit-code.ts`.
 | Code | Meaning |
 |---|---|
 | `0` | Passed, or the policy chose not to block |
-| `1` | Crosscheck itself failed (bad config, not a git repo, crash) |
+| `1` | Verik itself failed (bad config, not a git repo, crash) |
 | `2` | **Policy blocked.** Do not ship this. |
 | `3` | Blocking mode, but verification never reached a verdict |
 | other | The wrapped command's own exit code, passed through |
@@ -173,7 +173,7 @@ This contract is load-bearing. `src/core/run/exit-code.ts`.
 Two false-green traps this design exists to prevent:
 
 - A policy verdict must **not** discard the wrapped command's exit code.
-  `crosscheck run -- npm test` with failing tests must not exit 0.
+  `verik run -- npm test` with failing tests must not exit 0.
 - With no API key every LLM stage fails, so there is no policy at all. The old
   fallback returned 0 and recorded the run as `completed` — reporting success
   for verification that never happened. Now it records `inconclusive`.
@@ -227,7 +227,7 @@ patch, not as an addition. A file the developer edited *and* the agent then
 edited further is attributed correctly at line granularity — the developer's
 line is context, the agent's is `+`.
 
-`.crosscheck/` output is always excluded from attribution.
+`.verik/` output is always excluded from attribution.
 
 ---
 
@@ -277,7 +277,7 @@ short paths available that a person would mention out loud.
 | `suppression-added` | medium | `eslint-disable`, `@ts-ignore`, `# noqa` |
 | `swallowed-error` | medium | `except: pass`, `catch {}` |
 | `disabled-tests` | medium | `.skip`, `xit`, `@Ignore`, `.only` |
-| `ci-workflow-modified` | medium | CI config or `.crosscheck/policy.json` changed |
+| `ci-workflow-modified` | medium | CI config or `.verik/policy.json` changed |
 | `gitignore-weakened` | medium | Ignore entry removed |
 | `db-migration` | medium | Migration added or modified |
 | `empty-catch` | low | Empty catch block |
@@ -320,7 +320,7 @@ produced **19 false positives and 0 real defects** before the three guards, and
 
 ## 7. Policy
 
-`.crosscheck/policy.json` — committed, so policy changes appear in pull requests.
+`.verik/policy.json` — committed, so policy changes appear in pull requests.
 
 ```json
 {
@@ -370,21 +370,21 @@ than dropped, so turning a check off can never hide something silently:
 Installs a marker-delimited block into `pre-commit`:
 
 ```sh
-# >>> crosscheck >>>
-# <<< crosscheck <<<
+# >>> verik >>>
+# <<< verik <<<
 ```
 
 **Three properties that matter more than the feature:**
 
 1. **Never destroys an existing hook.** Appended after it by default, so it sees
-   any formatting that hook applied. Backed up to `pre-commit.crosscheck-backup`
+   any formatting that hook applied. Backed up to `pre-commit.verik-backup`
    on first install. Reinstalling replaces the block in place — install twice ≠
    installed twice.
 2. **Exactly reversible.** Uninstall rewrites the file byte-for-byte, and
    deletes it entirely if only our block was in it.
-3. **Never blocks a commit because crosscheck broke.** Exit codes are mapped,
+3. **Never blocks a commit because verik broke.** Exit codes are mapped,
    not passed through: `2|3` → block, anything else → warn and allow. If
-   `crosscheck` is not on `PATH` the hook is a no-op.
+   `verik` is not on `PATH` the hook is a no-op.
 
 **Two traps that fail silently, both handled:**
 
@@ -394,7 +394,7 @@ Installs a marker-delimited block into `pre-commit`:
 - An existing hook ending in an unconditional `exit` would strand an appended
   block. Detected; installs *before* it instead and says so.
 
-The hook runs `crosscheck verify --mode rules` — full mode would call the API on
+The hook runs `verik verify --mode rules` — full mode would call the API on
 every commit.
 
 Escape hatch: `git commit --no-verify`.
@@ -416,7 +416,7 @@ supports every mode:
 response_format: json_schema  →  json_object  →  extract JSON from text
 ```
 
-Model precedence: `CROSSCHECK_MODEL_{SCOUT,REVIEWER,JUDGE}` env vars override
+Model precedence: `VERIK_MODEL_{SCOUT,REVIEWER,JUDGE}` env vars override
 `config.models.*`.
 
 ---
@@ -424,7 +424,7 @@ Model precedence: `CROSSCHECK_MODEL_{SCOUT,REVIEWER,JUDGE}` env vars override
 ## 10. File layout
 
 ```
-.crosscheck/
+.verik/
   config.json      # provider, models, builder, privacy, verification  (committed)
   policy.json      # mode, thresholds, per-rule tuning                 (committed)
   repo.json        # repo fingerprint / repoId                         (committed)
@@ -434,12 +434,12 @@ Model precedence: `CROSSCHECK_MODEL_{SCOUT,REVIEWER,JUDGE}` env vars override
   cache/           # verification cache                                (ignored)
 ```
 
-`.crosscheck/.gitignore` ignores `runs/` and `cache/` only.
+`.verik/.gitignore` ignores `runs/` and `cache/` only.
 
 ### A run record
 
 ```
-runs/ccr_<id>/
+runs/vk_<id>/
   metadata.json       # run id, repo, branch, baseline commit, status
   report.json         # the full report, incl. suppressedFindings
   report.md
@@ -465,10 +465,10 @@ src/
   core/
     repository/
       worktree-tree.ts              # ← the attribution engine
-      checkpoint.ts                 # crosscheck begin
+      checkpoint.ts                 # verik begin
       diff-capture.ts
       git-repository.ts
-    hooks/git-hooks.ts              # crosscheck hook
+    hooks/git-hooks.ts              # verik hook
     policy/
       policy-engine.ts
       rule-policy.ts                # per-rule severity + disable
@@ -522,13 +522,13 @@ node dist/index.js verify                    # against this repo — expect 0 fi
 
 ## 13. Known gaps
 
-**Naming — unresolved.** `crosscheck` cannot be published unscoped: npm's
+**Naming — unresolved.** `verik` cannot be published unscoped: npm's
 typosquat filter blocks it because the abandoned `cross-check` (last published
-2017) exists. Worse, **`crosscheck-cli` is an active, unrelated project** by
+2017) exists. Worse, **`verik-cli` is an active, unrelated project** by
 `fxspeiser` — ~3.3k downloads/month, publishing near-daily, and it installs the
-same `crosscheck` binary. `checkride` is also taken by an active AI coding tool.
-Options: ship scoped as `@crosscheck-sh/crosscheck` (binary can still be
-`crosscheck`), or rename. Decision parked.
+same `verik` binary. `checkride` is also taken by an active AI coding tool.
+Options: ship scoped as `@verik-sh/verik` (binary can still be
+`verik`), or rename. Decision parked.
 
 **Not published to npm.** Needs `NPM_TOKEN` in repo secrets and a version tag.
 `release.yml` publishes any `v*` tag straight to `latest` — it does **not**
@@ -561,5 +561,5 @@ If you change one of these, you have changed the product.
 6. Deterministic findings are not gated on model confidence.
 7. Suppressing a finding always leaves a trace in the run record.
 8. Nothing blocks in a non-TTY. Nothing prompts in CI.
-9. A crosscheck failure never costs the developer their commit.
+9. A verik failure never costs the developer their commit.
 10. No rule pattern may carry the `g` or `y` flag.

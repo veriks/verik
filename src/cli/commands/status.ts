@@ -6,7 +6,7 @@ import { block, kv, mark, pass, section, subtle, warn } from '../output/theme.js
 
 export function buildStatusCommand(): Command {
   return new Command('status')
-    .description('Show Crosscheck status for the current repository')
+    .description('Show Verik status for the current repository')
     .action(async () => {
       try {
         const info = await getRepositoryInfo(process.cwd());
@@ -21,7 +21,7 @@ export function buildStatusCommand(): Command {
         console.log(kv('commit', subtle(info.commitSha.slice(0, 8))));
         console.log(kv('dirty', info.isDirty ? warn('yes') : subtle('no')));
 
-        console.log(`\n${section('crosscheck')}`);
+        console.log(`\n${section('verik')}`);
         console.log(kv('provider', config.provider));
         console.log(kv('policy', policy.mode));
         // Without a key every LLM stage fails, so this is the single most
@@ -35,7 +35,7 @@ export function buildStatusCommand(): Command {
           console.log(kv('latest', runs[0] ?? ''));
           console.log(kv('total', String(runs.length)));
         } else {
-          console.log(subtle('  none yet — try: crosscheck run -- <command>'));
+          console.log(subtle('  none yet — try: verik run -- <command>'));
         }
         console.log();
       } catch (err) {

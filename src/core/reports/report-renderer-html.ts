@@ -235,7 +235,7 @@ export function renderHtmlReport(context: RunContext, pipeline: PipelineResult):
 </details>`
     : '';
 
-  // An HTML report is the most shareable artifact Crosscheck produces, so it
+  // An HTML report is the most shareable artifact Verik produces, so it
   // renders the sanitised patch.
   const diffSec = diff?.safePatch
     ? `
@@ -262,13 +262,13 @@ export function renderHtmlReport(context: RunContext, pipeline: PipelineResult):
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${e(tok.label)} — Crosscheck</title>
+<title>${e(tok.label)} — Verik</title>
 <style>${css()}</style>
 </head>
 <body>
 
 <div class="topbar">
-  <span class="topbar-logo">Crosscheck</span>
+  <span class="topbar-logo">Verik</span>
   <span class="topbar-id">${e(record.runId)}</span>
 </div>
 
@@ -323,7 +323,7 @@ export function renderHtmlReport(context: RunContext, pipeline: PipelineResult):
       : ''
   }
 
-  <div class="footer">Crosscheck · not a guarantee of correctness or security</div>
+  <div class="footer">Verik · not a guarantee of correctness or security</div>
 </div>
 
 </body>

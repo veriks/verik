@@ -19,7 +19,7 @@ function openInBrowser(path: string): void {
 
 export function buildReportCommand(): Command {
   return new Command('report')
-    .description('Print a Crosscheck run report')
+    .description('Print a Verik run report')
     .argument('[run-id]', 'Run ID (defaults to latest)')
     .option('--json', 'Print JSON report')
     .option('--html', 'Print HTML report path')
@@ -36,7 +36,7 @@ export function buildReportCommand(): Command {
             const ids = await listRunIds(info.root);
             id = ids[0];
             if (!id) {
-              console.log('No runs found. Try: crosscheck run -- <command>');
+              console.log('No runs found. Try: verik run -- <command>');
               return;
             }
           }
@@ -52,7 +52,7 @@ export function buildReportCommand(): Command {
                 console.log(path);
               }
             } catch {
-              console.error('HTML report not found — run crosscheck again to generate it.');
+              console.error('HTML report not found — run verik again to generate it.');
               process.exit(1);
             }
             return;

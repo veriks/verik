@@ -19,15 +19,15 @@ export interface TestRepo {
  * Call cleanup() in afterEach/afterAll.
  */
 export async function createTestRepo(): Promise<TestRepo> {
-  const root = join(tmpdir(), `crosscheck-test-${tmpId()}`);
+  const root = join(tmpdir(), `verik-test-${tmpId()}`);
   await mkdir(root, { recursive: true });
 
   const git = simpleGit(root);
   await git.init();
 
   // Minimal git identity — required for commits to work in CI and clean environments.
-  await git.addConfig('user.email', 'test@crosscheck.local');
-  await git.addConfig('user.name', 'Crosscheck Test');
+  await git.addConfig('user.email', 'test@verik.local');
+  await git.addConfig('user.name', 'Verik Test');
 
   const write = async (relativePath: string, content: string) => {
     const full = join(root, relativePath);

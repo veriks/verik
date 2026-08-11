@@ -14,7 +14,7 @@ import { MARK_RAW, bold, brand, frameWidth, muted, pass, subtle, warn } from './
 /**
  * Interactive prompts for onboarding.
  *
- * Non-interactive safety is a hard requirement, not a nicety: Crosscheck is
+ * Non-interactive safety is a hard requirement, not a nicety: Verik is
  * routinely run by CI and by coding agents wrapping it, where stdin is not a
  * TTY. Every prompt returns its default in that case rather than blocking
  * forever on a keypress that will never arrive.
@@ -169,8 +169,8 @@ export function checklist(items: CheckItem[], width = 16): string[] {
 
 /** Step indicator, right-aligned against the frame. */
 export function stepHeader(mark: string, step: number, total: number): string[] {
-  const left = `${mark}  ${bold('crosscheck')}`;
-  const rawLeft = `${MARK_RAW}  crosscheck`;
+  const left = `${mark}  ${bold('verik')}`;
+  const rawLeft = `${MARK_RAW}  verik`;
   const right = `step ${step} of ${total}`;
   const gap = Math.max(1, frameWidth() - rawLeft.length - right.length);
   return [`\n${left}${' '.repeat(gap)}${subtle(right)}`, subtle('─'.repeat(frameWidth())), ''];

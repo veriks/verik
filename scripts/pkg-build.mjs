@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Builds standalone binaries for all platforms and generates sha256 checksums.
 // Designed to run in GitHub Actions on Ubuntu — pkg cross-compiles for all targets.
-// Local dev on Windows/Mac: use `npm install -g crosscheck` or `pnpm link` instead.
+// Local dev on Windows/Mac: use `npm install -g verik` or `pnpm link` instead.
 
 import { execSync } from 'node:child_process';
 import { createReadStream, mkdirSync } from 'node:fs';
@@ -23,7 +23,7 @@ console.log('Building binaries for all platforms...');
 execSync(
   `node node_modules/@yao-pkg/pkg/lib-es5/bin.js dist-bin/index.cjs` +
   ` --targets ${TARGETS.join(',')}` +
-  ` --output releases/crosscheck`,
+  ` --output releases/verik`,
   { stdio: 'inherit' },
 );
 

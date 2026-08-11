@@ -1,13 +1,13 @@
 import type { PipelineResult } from '../../core/pipeline/verification-pipeline.js';
 import type { RunContext } from '../../core/run/run-context.js';
 import type { RunRecord } from '../../core/run/run-state.js';
-import { CrosscheckConfigSchema, PolicyConfigSchema } from '../../config/config-schema.js';
+import { VerikConfigSchema, PolicyConfigSchema } from '../../config/config-schema.js';
 import { VerificationCache } from '../../core/cache/verification-cache.js';
 import { asRawPatch } from '../../core/privacy/patch-types.js';
 import { prepareSafePatch } from '../../core/privacy/diff-sanitizer.js';
 import { createProgress } from './progress.js';
 
-const FAKE_RUN_ID = 'ccr_DEMO0000000000000001';
+const FAKE_RUN_ID = 'vk_DEMO0000000000000001';
 
 const FAKE_TREE = 'd0000000000000000000000000000000000demo0';
 
@@ -340,7 +340,7 @@ export function buildFakePipeline(): PipelineResult {
 }
 
 export function buildFakeContext(record: RunRecord): RunContext {
-  const config = CrosscheckConfigSchema.parse({ version: 1 });
+  const config = VerikConfigSchema.parse({ version: 1 });
   const policy = PolicyConfigSchema.parse({ version: 1 });
   return {
     runId: FAKE_RUN_ID,

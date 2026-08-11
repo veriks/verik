@@ -44,10 +44,10 @@ describe('orchestrateRun', () => {
       noBuilder: false,
     });
 
-    expect(result.runId).toMatch(/^ccr_/);
+    expect(result.runId).toMatch(/^vk_/);
     expect(norm(result.repoRoot)).toBe(norm(repo.root));
 
-    const metaPath = join(repo.root, '.crosscheck', 'runs', result.runId, 'metadata.json');
+    const metaPath = join(repo.root, '.verik', 'runs', result.runId, 'metadata.json');
     const meta = JSON.parse(await readFile(metaPath, 'utf8')) as {
       changedFiles: string[];
       commandIntroducedPaths: string[];
@@ -57,10 +57,10 @@ describe('orchestrateRun', () => {
 
     // Report files must exist.
     await expect(
-      access(join(repo.root, '.crosscheck', 'runs', result.runId, 'report.md')),
+      access(join(repo.root, '.verik', 'runs', result.runId, 'report.md')),
     ).resolves.toBeUndefined();
     await expect(
-      access(join(repo.root, '.crosscheck', 'runs', result.runId, 'report.json')),
+      access(join(repo.root, '.verik', 'runs', result.runId, 'report.json')),
     ).resolves.toBeUndefined();
   }, 15000);
 
@@ -75,7 +75,7 @@ describe('orchestrateRun', () => {
       noBuilder: false,
     });
 
-    expect(result.runId).toMatch(/^ccr_/);
+    expect(result.runId).toMatch(/^vk_/);
     expect(result.exitCode).toBe(0);
   });
 
@@ -103,7 +103,7 @@ describe('orchestrateRun', () => {
       noBuilder: false,
     });
 
-    const metaPath = join(repo.root, '.crosscheck', 'runs', result.runId, 'metadata.json');
+    const metaPath = join(repo.root, '.verik', 'runs', result.runId, 'metadata.json');
     const meta = JSON.parse(await readFile(metaPath, 'utf8')) as {
       wrappedCommandExitCode: number;
       changedFiles: string[];
@@ -138,7 +138,7 @@ describe('orchestrateRun', () => {
       noBuilder: false,
     });
 
-    const metaPath = join(repo.root, '.crosscheck', 'runs', result.runId, 'metadata.json');
+    const metaPath = join(repo.root, '.verik', 'runs', result.runId, 'metadata.json');
     const meta = JSON.parse(await readFile(metaPath, 'utf8')) as {
       commandIntroducedPaths: string[];
       preExistingChangedPaths: string[];

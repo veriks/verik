@@ -6,7 +6,7 @@
 
 - [ ] `pnpm typecheck`
 - [ ] `pnpm test`
-- [ ] `crosscheck demo` (fake run, no network) still works
+- [ ] `verik demo` (fake run, no network) still works
 - [ ] Manually verified with a real `ANTHROPIC_API_KEY` if this touches Scout/Reviewer/Judge prompts or the inference layer
 
 ## Checklist

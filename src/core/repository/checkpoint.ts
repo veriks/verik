@@ -8,14 +8,14 @@ import { logger } from '../../shared/logger.js';
 /**
  * An explicit baseline, for agents that cannot be wrapped.
  *
- * `crosscheck run -- <cmd>` gets its baseline for free: snapshot before the
+ * `verik run -- <cmd>` gets its baseline for free: snapshot before the
  * command, snapshot after. But an agent inside Cursor, Copilot or the Claude
  * desktop app is not a command there is any way to wrap, and `verify` alone
  * falls back to diffing against HEAD — which cannot tell the agent's work from
  * whatever the developer had already half-finished.
  *
  * A checkpoint restores exact attribution for those workflows. The tree is a
- * real git tree in Crosscheck's own object store, identical in kind to the one
+ * real git tree in Verik's own object store, identical in kind to the one
  * the wrap path builds, so everything downstream is unchanged.
  */
 
@@ -29,7 +29,7 @@ const CheckpointSchema = z.object({
 
 export type Checkpoint = z.infer<typeof CheckpointSchema>;
 
-const checkpointPath = (root: string): string => join(root, '.crosscheck', 'checkpoint.json');
+const checkpointPath = (root: string): string => join(root, '.verik', 'checkpoint.json');
 
 export async function writeCheckpoint(
   root: string,
@@ -76,7 +76,7 @@ export async function clearCheckpoint(root: string): Promise<void> {
  * it made the agent's work invisible, and `verify` reported "No changes to
  * verify" over two commits of real changes.
  *
- * The checkpoint tree is a real git object in Crosscheck's own store; it does
+ * The checkpoint tree is a real git object in Verik's own store; it does
  * not stop being a valid diff target because HEAD moved forward. What genuinely
  * breaks it is HEAD moving *sideways* — checking out unrelated history, where
  * the diff would attribute someone else's commits to the agent.

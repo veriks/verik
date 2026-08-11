@@ -4,7 +4,7 @@ import { isInteractive, select, ask } from './prompt.js';
 
 /**
  * The behaviour that matters here is what happens when nobody is watching.
- * Crosscheck is routinely run by CI and by coding agents, where stdin is not a
+ * Verik is routinely run by CI and by coding agents, where stdin is not a
  * TTY — a prompt that blocks there hangs the whole pipeline forever, and it is
  * exactly the case a human testing by hand never hits.
  */
