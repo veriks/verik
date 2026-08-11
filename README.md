@@ -90,29 +90,74 @@ no key, no network and no provider at all.
 
 ## Quick start
 
-Not on npm yet. Building from source takes about a minute:
+### 1. Install
+
+Not on npm yet, so build from source. Needs Node 20+, git and pnpm.
 
 ```sh
 git clone https://github.com/veriks/verik.git
 cd verik && pnpm install && pnpm build && npm link
 ```
 
-Then, in any repository:
+### 2. Set it up in your project — once
 
 ```sh
+cd ~/your-project
 verik init --yes --mode rules
-verik run -- claude -p "add rate limiting"
+verik policy mode blocking
+verik hook install
 ```
 
-`rules` mode needs no API key and makes no network calls.
+That is the whole setup. Every `git commit` now runs 23 deterministic checks
+first, and a finding at `high` or above stops the commit. No API key, no
+network, silent when your code is clean.
 
-If your agent runs somewhere Verik can't wrap it, like Cursor, Copilot or a
-desktop app, mark the baseline yourself instead:
+Any hook you already have — husky, lint-staged — keeps working. `git commit
+--no-verify` skips it once, and `verik hook uninstall` removes it exactly.
+
+### 3. Using it with an AI agent
+
+Most agents edit your files directly: Cursor, Copilot, the Claude or ChatGPT
+desktop app, or code you pasted in. Mark the line before you start, then check
+what changed:
 
 ```sh
-verik begin        # then let the agent work
+verik begin
+```
+
+```sh
 verik verify
 ```
+
+`begin` records where you were, so your own half-finished work is not blamed on
+the agent. It survives the agent committing.
+
+If your agent is a terminal command, wrap it and skip `begin` entirely:
+
+```sh
+verik run -- claude -p "add rate limiting"
+verik run -- codex exec "fix the failing test"
+verik run -- aider --message "..."
+```
+
+Anything after `--` runs verbatim, so whatever you normally type works.
+
+### 4. Optional — add a model
+
+Everything above is deterministic and free. To also get the Scout, Reviewer and
+Judge stages, put your key in a `.env` file at your project root:
+
+```sh
+OPENAI_API_KEY=sk-...
+```
+
+```sh
+verik doctor                  # confirms the key and the models, without billing
+verik verify --mode full
+```
+
+A `.env` file avoids shell syntax differences entirely, and is gitignored. See
+[Works with any model](#works-with-any-model) for other providers.
 
 ## What you see
 
