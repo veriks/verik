@@ -19,7 +19,12 @@ import { resolveExit } from '../../core/run/exit-code.js';
 import { readCheckpoint, isStale, commitsSince } from '../../core/repository/checkpoint.js';
 import { ensureCheckpointStore } from '../../core/repository/worktree-tree.js';
 import { subtle, warn } from '../output/theme.js';
-import { printChanges, printHeader, printVerdictSummary } from '../output/terminal.js';
+import {
+  printChanges,
+  printContextLimits,
+  printHeader,
+  printVerdictSummary,
+} from '../output/terminal.js';
 
 export function buildVerifyCommand(): Command {
   return new Command('verify')
@@ -175,6 +180,7 @@ export function buildVerifyCommand(): Command {
           // see it, which is the worst possible failure for this tool.
           printHeader(runId);
           printChanges(diff.additions, diff.deletions, diff.changedFiles.length);
+          printContextLimits(diff);
           printVerdictSummary(pipeline, { runId, exitCode: 0, repoRoot: root }, flags.intent);
         }
         if (flags.json) {

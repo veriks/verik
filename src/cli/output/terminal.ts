@@ -18,6 +18,7 @@ import {
   subtle,
   underline,
   verdictTint,
+  warn as warnTint,
   wordmark,
 } from './theme.js';
 
@@ -54,6 +55,32 @@ export function printChanges(additions: number, deletions: number, fileCount: nu
   console.log(
     `${muted(files)} ${subtle('·')} ${pass(`+${additions}`)} ${block(`−${deletions}`)}\n`,
   );
+}
+
+/**
+ * Says when a file was withheld from the model.
+ *
+ * A file larger than `maxDiffBytes` is dropped from the safe patch whole, not
+ * trimmed — so in `full` mode the Reviewer and Judge issue a verdict on a change
+ * they never saw. Only `verik inspect` mentioned this, which nobody runs unless
+ * they already suspect something, so a confident verdict on a partly invisible
+ * diff looked exactly like a confident verdict on all of it.
+ *
+ * The deterministic rules are unaffected — they read the raw patch — which is
+ * why the line says where the remaining coverage comes from.
+ */
+export function printContextLimits(diff: {
+  truncated?: boolean;
+  excludedFiles?: Array<{ path: string }>;
+}): void {
+  if (!diff.truncated) return;
+  console.log(
+    warnTint(
+      '! Part of this diff was too large to send to the model — those files were ' +
+        'checked by the deterministic rules only.',
+    ),
+  );
+  console.log(subtle('  verik inspect shows exactly what was withheld.\n'));
 }
 
 /**
