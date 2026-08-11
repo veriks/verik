@@ -31,6 +31,53 @@ half-finished is baked into the first snapshot, so it reads as context rather
 than as the agent's work. Your repository is never staged, stashed, committed or
 checked out.
 
+## Works with any model
+
+Verik is not tied to one vendor. Pick a provider at `verik init`, or set the
+environment variable and go.
+
+| Provider | Environment variable |
+|----------|---------------------|
+| Anthropic | `ANTHROPIC_API_KEY` |
+| OpenAI | `OPENAI_API_KEY` |
+| Google (Gemini) | `GEMINI_API_KEY` |
+| Mistral | `MISTRAL_API_KEY` |
+| DeepSeek | `DEEPSEEK_API_KEY` |
+| Groq | `GROQ_API_KEY` |
+| OpenRouter | `OPENROUTER_API_KEY` |
+| Together AI | `TOGETHER_API_KEY` |
+| Fireworks AI | `FIREWORKS_API_KEY` |
+| Hugging Face | `HF_TOKEN` |
+| Ollama | none — local, nothing leaves your machine |
+
+Each ships sensible default models. Override any stage individually:
+
+```sh
+export VERIK_MODEL_SCOUT=gpt-4o-mini      # cheap, runs first
+export VERIK_MODEL_REVIEWER=gpt-4o
+export VERIK_MODEL_JUDGE=gpt-4o
+```
+
+### Anything else that speaks OpenAI
+
+If it exposes `/chat/completions`, Verik can use it — point it anywhere:
+
+```sh
+export VERIK_BASE_URL=http://localhost:4000/v1
+export VERIK_API_KEY=your-key
+```
+
+That covers LiteLLM, vLLM, LM Studio, self-hosted gateways, corporate proxies
+and anything behind a company firewall. Structured output degrades in three
+steps — `json_schema`, then `json_object`, then extracting JSON from plain text
+— so hosts that only implement part of the spec still work.
+
+Not sure what your setup needs? `verik doctor` names the exact variable for your
+configured provider and checks the endpoint answers.
+
+**And none of this is required.** `rules` mode runs 23 deterministic checks with
+no key, no network and no provider at all.
+
 ## Quick start
 
 Not on npm yet. Building from source takes about a minute:
@@ -177,7 +224,7 @@ src/
   core/policy/                           policy engine, rule tuning, overrides
   core/pipeline/                         stage orchestration
   stages/reviewer/deterministic-rules/   the 23 checks
-  inference/                             12 model providers
+  inference/                             11 providers + custom endpoints
   config/                                schemas and loader
 ```
 
@@ -214,13 +261,14 @@ pnpm test
 
 | Variable | Description |
 |----------|-------------|
-| `ANTHROPIC_API_KEY` | Required for `full` mode only |
+| `VERIK_API_KEY` | Key for any provider, overriding the provider-specific one |
+| `VERIK_BASE_URL` | Endpoint override — point at any OpenAI-compatible host |
 | `VERIK_MODEL_SCOUT` | Override the Scout model |
 | `VERIK_MODEL_REVIEWER` | Override the Reviewer model |
 | `VERIK_MODEL_JUDGE` | Override the Judge model |
 
-Anthropic, OpenAI, Gemini, Mistral, DeepSeek, xAI, Groq and Cohere are supported
-directly. OpenRouter, Together, Fireworks and Hugging Face work as aggregators.
+Or the provider's own key — see [Works with any model](#works-with-any-model).
+`rules` mode needs none of them.
 
 ## Privacy
 
