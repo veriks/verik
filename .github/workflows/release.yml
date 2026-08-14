@@ -10,8 +10,8 @@ permissions:
   id-token: write
 
 jobs:
-  build-binaries:
-    name: Build binaries
+  release:
+    name: Publish to npm
     runs-on: ubuntu-latest
     # Publishing is the one irreversible thing this repo does, and NPM_TOKEN is
     # readable by any workflow anyone with write access can push. Requiring an
@@ -40,11 +40,7 @@ jobs:
       - name: Build ESM bundle (for npm)
         run: pnpm build
 
-      - name: Build CJS bundle (for binaries)
-        run: pnpm exec tsup --config tsup.binary.config.ts
 
-      - name: Build standalone binaries
-        run: node scripts/pkg-build.mjs
 
       # Never publish an artifact nobody has run. `demo` exercises the whole
       # pipeline — CLI wiring, report rendering, policy — with no network or
@@ -101,23 +97,22 @@ jobs:
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          files: releases/*
           generate_release_notes: true
           prerelease: ${{ steps.disttag.outputs.prerelease == 'true' }}
           body: |
             ## Install
 
-            **npm (recommended)**
             ```sh
             npm install -g verik
             ```
+
             Prereleases are not on `latest` — install those explicitly, e.g.
             `npm install -g verik@alpha`.
 
-            **curl (macOS / Linux)**
+            Then, in any repository:
+
             ```sh
-            curl -fsSL https://raw.githubusercontent.com/veriks/verik/main/scripts/install.sh | sh
+            verik init
             ```
 
-            **Direct download**
-            Pick the binary for your platform below.
+            See the [quickstart](https://github.com/veriks/verik/blob/main/docs/quickstart.md).

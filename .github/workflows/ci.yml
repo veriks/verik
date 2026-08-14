@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # We ship binaries for Linux, macOS and Windows, and the riskiest code —
+        # Verik runs on Linux, macOS and Windows, and the riskiest code —
         # git plumbing driven by env vars, realpath containment, symlink handling
         # — is exactly the kind that diverges per platform. Linux-only CI cannot
         # see those breaks. The symlink-escape test in paths-safe.test.ts is
