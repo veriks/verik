@@ -546,7 +546,7 @@ unfinished build in front of users. Fix before the first tag.
 deliberately; the non-LLM path is what works today.
 
 **No tamper-evidence on the run record.** A run record can be edited after the
-fact. Named as an open gap in `docs/positioning.md`.
+fact. This is a known gap.
 
 **Interactive rule toggle UI not built.** The flag-based commands cover the need.
 

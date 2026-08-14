@@ -12,4 +12,4 @@
 ## Checklist
 
 - [ ] No secrets or API keys committed
-- [ ] Docs (`README.md` / `STATE.md`) updated if behavior or config changed
+- [ ] Docs (`README.md` / `docs/reference.md`) updated if behaviour or config changed

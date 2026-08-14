@@ -426,11 +426,6 @@ values are never sent, only keys. Files matching `excludePatterns` (`.env`,
 - Verik never mutates your repository.
 - A missing verdict never reads as a pass.
 
-## Releasing
-
-Platform testing, release steps and launch sequencing:
-**[docs/release-checklist.md](docs/release-checklist.md)**
-
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Security issues: [SECURITY.md](SECURITY.md).

@@ -101,4 +101,4 @@ Fixtures should be derived from real runs:
 
 That exercise produces the precision number, the ground truth, and evidence of
 which prompt is weakest, all at once. It is the recommended next step in
-[STATE.md](../../STATE.md) §8 for exactly this reason.
+exactly this reason.
