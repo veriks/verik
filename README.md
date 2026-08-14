@@ -92,12 +92,23 @@ no key, no network and no provider at all.
 
 ### 1. Install
 
-Not on npm yet, so build from source. Needs Node 20+, git and pnpm.
+Needs **Node 20+** and **git**.
+
+```sh
+npm install -g verik
+```
+
+Check it: `verik --version` should print `0.1.1`.
+
+<details>
+<summary>Build from source instead</summary>
 
 ```sh
 git clone https://github.com/veriks/verik.git
 cd verik && pnpm install && pnpm build && npm link
 ```
+
+</details>
 
 ### 2. Set it up in your project
 

@@ -21,7 +21,7 @@ import { buildRulesCommand } from './commands/rules.js';
 import { buildPolicyCommand } from './commands/policy.js';
 import { banner } from './output/theme.js';
 
-const VERSION = '0.1.0';
+const VERSION = '0.1.1';
 
 const program = new Command();
 

@@ -7,28 +7,23 @@ repository.
 This walkthrough takes about ten minutes on a repo you already have. No API key,
 no account, no network calls.
 
-**Heads up before you start:** this is pre-release. It is not on npm yet, so
-step 1 is building from source. Everything below has been tested, but you are
-early.
+**Heads up before you start:** this is an early release. Everything below has
+been tested on Linux, macOS and Windows, but you are early — if something reads
+wrong, that is worth an issue.
 
 ---
 
 ## 1. Install
 
-You need **Node 20 or newer**, **git**, and **pnpm**. Check:
+You need **Node 20 or newer** and **git**. Check:
 
 ```sh
 node --version    # must be v20+
 git --version
-pnpm --version    # if missing: npm install -g pnpm
 ```
 
 ```sh
-git clone https://github.com/veriks/verik.git
-cd verik
-pnpm install
-pnpm build
-npm link
+npm install -g verik
 ```
 
 Check it worked:
@@ -37,11 +32,11 @@ Check it worked:
 verik --version
 ```
 
-You should see `0.1.0`. If `verik` isn't found, your npm global bin isn't on
-`PATH` — you can skip `npm link` and use `node /path/to/verik/dist/index.js`
-anywhere you'd type `verik` below.
+You should see `0.1.1`. If `verik` isn't found, your npm global bin directory
+isn't on `PATH` — `npm bin -g` prints it.
 
-> No pnpm? `npm install -g pnpm`, or use `npm install && npm run build` instead.
+> **Building from source instead?** `git clone`, then `pnpm install && pnpm
+> build && npm link` in the clone. You only need this to work on Verik itself.
 
 ---
 

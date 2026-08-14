@@ -27,8 +27,9 @@ jobs:
         with:
           node-version: '20'
 
-      # Not published to npm yet, so build from source.
-      - run: npm install -g pnpm && pnpm install --frozen-lockfile && pnpm build && npm link
+      # Pin the version so a future release cannot change what your gate does
+      # without you choosing it.
+      - run: npm install -g verik@0.1.1
 
       - name: Verify changes
         env:
