@@ -381,7 +381,7 @@ pnpm test
 | ---------------- | ------------------------------- |
 | `pnpm build`     | Bundle to `dist/`               |
 | `pnpm build:bin` | Standalone binaries             |
-| `pnpm test`      | Vitest, 206 tests               |
+| `pnpm test`      | Vitest, 222 tests               |
 | `pnpm lint`      | ESLint                          |
 | `pnpm typecheck` | tsc, no emit                    |
 | `pnpm check`     | Lint, types and format together |
@@ -407,6 +407,7 @@ pnpm test
 | `VERIK_MODEL_SCOUT`    | Override the Scout model                                   |
 | `VERIK_MODEL_REVIEWER` | Override the Reviewer model                                |
 | `VERIK_MODEL_JUDGE`    | Override the Judge model                                   |
+| `VERIK_BASE_URL`       | Endpoint override for any OpenAI-compatible host            |
 
 Or the provider's own key — see [Works with any model](#works-with-any-model).
 `rules` mode needs none of them.

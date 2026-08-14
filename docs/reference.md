@@ -4,7 +4,7 @@ Complete reference for the CLI, the architecture, and the invariants that must
 not be broken. Written to be enough for someone (or another agent) to pick the
 project up cold.
 
-Status as of this document: **203 tests green**, lint clean, builds. Not
+Status as of this document: **222 tests green**, lint clean, builds. Not
 published to npm. Branch `main`.
 
 ---
@@ -49,11 +49,13 @@ in a pre-commit hook.
 ### Setup
 
 ```sh
-verik init [--yes] [--mode rules|full]
+verik init [--yes] [--mode rules|full] [--policy shadow|advisory|blocking] [--hook]
 ```
 
 Creates `.verik/` with `config.json`, `policy.json`, `repo.json`. Interactive
-arrow-key onboarding unless `--yes`. Works in a repository with an unborn HEAD
+arrow-key onboarding unless `--yes`: mode, provider, what should happen when
+something is found, and whether to install the git hook. Re-running it merges
+into what is already there rather than replacing it, so tuning survives. Works in a repository with an unborn HEAD
 (`git init` with no commits) — that is a supported state, not an error.
 
 ```sh
@@ -76,6 +78,7 @@ verik run -- aider
 verik verify [options]             # verify the current uncommitted diff
   --json                                # machine-readable
   --quiet                               # suppress output
+  --verbose                             # log stage errors and provider requests
   --intent <text>                       # what the change was meant to do
   --base <ref>                          # verify <ref>..HEAD instead (for CI)
   --mode rules|full                     # override the configured mode
@@ -97,8 +100,11 @@ verik verify           # diffs against the checkpoint, not HEAD
 verik begin --clear    # discard the checkpoint
 ```
 
-A checkpoint is **stale** if the branch or commit has changed since it was
-taken; `verify` warns and falls back to HEAD rather than reporting nonsense.
+A checkpoint is **stale** only when its commit is not an ancestor of HEAD —
+that is, when history has moved sideways onto something unrelated. Commits made
+*after* `begin` are included, because agents commit and discarding the baseline
+the moment one does made the agent's work invisible. When it is genuinely stale,
+`verify` says so and falls back to HEAD rather than reporting nonsense.
 
 ### Git hook
 
@@ -497,7 +503,7 @@ src/
 ## 12. Development
 
 ```sh
-npm test          # vitest — 203 tests
+npm test          # vitest — 222 tests
 npm run lint      # eslint
 npm run build     # tsup → dist/index.js
 npm run build:bin # standalone binaries
