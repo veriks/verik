@@ -16,7 +16,9 @@ export const DisabledTestsRule = defineLineRule({
     /\bxit\s*\(/,
     /\bxdescribe\s*\(/,
     /\.skip\s*\(/,
-    /pytest\.mark\.skip/,
+    // `skipif` takes a condition — platform and version gates are ordinary
+    // engineering. Unconditional `skip` is the smell.
+    /pytest\.mark\.skip(?!if)/,
     /@Ignore\b/,
     /\bt\.Skip\s*\(/,
     /\.only\s*\(/,

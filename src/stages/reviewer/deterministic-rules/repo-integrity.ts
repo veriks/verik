@@ -24,25 +24,47 @@ export const CiWorkflowModifiedRule: DeterministicRule = {
   title: 'CI configuration changed',
   defaultSeverity: 'medium',
   async run(ctx: RuleContext): Promise<DeterministicFinding[]> {
-    return ctx.diff.changedFiles
-      .filter((f) => isCiPath(f.path))
-      .slice(0, 10)
-      .map((f) => ({
-        ruleId: 'ci-workflow-modified',
-        title: 'CI configuration changed',
-        severity: f.changeType === 'deleted' ? ('high' as const) : ('medium' as const),
-        confidence: 1.0,
-        file: f.path,
-        message:
-          f.changeType === 'deleted'
-            ? `A CI configuration file was deleted: ${f.path}. The checks it defined no longer run.`
-            : `A CI configuration file was ${f.changeType}: ${f.path}. This changes the checks every ` +
-              'future change is measured against.',
-        excerpt: f.path,
-        remediation:
-          'Confirm the change to the pipeline was intended and is not loosening a gate to make ' +
-          'this change pass.',
-      }));
+    const ci = ctx.diff.changedFiles.filter((f) => isCiPath(f.path));
+    // One finding, not one per file. A change that touches eight workflow files
+    // is one act; eight rows of it buried everything else in a real repository.
+    if (ci.length > 1) {
+      const deleted = ci.filter((f) => f.changeType === 'deleted');
+      return [
+        {
+          ruleId: 'ci-workflow-modified',
+          title: 'CI configuration changed',
+          severity: deleted.length > 0 ? ('high' as const) : ('medium' as const),
+          confidence: 1.0,
+          file: ci[0]!.path,
+          message:
+            `${ci.length} CI configuration files were changed: ${ci.map((f) => f.path).join(', ')}. ` +
+            'This changes the checks every future change is measured against.',
+          excerpt: ci
+            .map((f) => f.path)
+            .join(', ')
+            .slice(0, 120),
+          remediation:
+            'Confirm the change to the pipeline was intended and is not loosening a gate to make ' +
+            'this change pass.',
+        },
+      ];
+    }
+    return ci.slice(0, 10).map((f) => ({
+      ruleId: 'ci-workflow-modified',
+      title: 'CI configuration changed',
+      severity: f.changeType === 'deleted' ? ('high' as const) : ('medium' as const),
+      confidence: 1.0,
+      file: f.path,
+      message:
+        f.changeType === 'deleted'
+          ? `A CI configuration file was deleted: ${f.path}. The checks it defined no longer run.`
+          : `A CI configuration file was ${f.changeType}: ${f.path}. This changes the checks every ` +
+            'future change is measured against.',
+      excerpt: f.path,
+      remediation:
+        'Confirm the change to the pipeline was intended and is not loosening a gate to make ' +
+        'this change pass.',
+    }));
   },
 };
 

@@ -57,6 +57,14 @@ export const WeakCryptoRule = defineLineRule({
     /\b(?:token|secret|key|password|nonce|salt|session)\b[^\n]{0,60}Math\.random\s*\(\s*\)/i,
     /\brandom\.(?:random|randint|choice)\s*\([^\n]{0,60}\b(?:token|secret|key|password|salt)\b/i,
   ],
+  exceptions: [
+    // Python's own marker for "this digest is not security-relevant". Found on
+    // requests' HTTPDigestAuth, where RFC 7616 mandates MD5 and the author had
+    // already annotated exactly what this rule was asking about.
+    /usedforsecurity\s*=\s*False/,
+    // Same intent in other ecosystems.
+    /nosec|#\s*noqa:\s*S324|lgtm\[py\/weak-sensitive-data-hashing\]/,
+  ],
   message:
     'A broken or predictable cryptographic primitive was introduced. MD5 and SHA-1 are not ' +
     'collision-resistant, ECB leaks plaintext structure, and general-purpose RNGs are predictable.',
