@@ -60,12 +60,18 @@ export function buildRunCommand(): Command {
         // aborts the process on Windows and replaces the exit code with 127.
         process.exitCode = result.exitCode;
       } catch (err) {
+        // Same reason as the verdict path above: `process.exit()` while an
+        // HTTP handle is closing aborts the process on Windows and replaces
+        // this code with 127.
         if (err instanceof VerikError) {
           if (!flags.quiet) printError(err.message);
-          process.exit(err.exitCode);
+          // `return` because process.exit() used to be the control flow here —
+          // without it, execution falls through and reports the error twice.
+          process.exitCode = err.exitCode;
+          return;
         }
         if (!flags.quiet) printError(String(err));
-        process.exit(1);
+        process.exitCode = 1;
       }
     });
 }

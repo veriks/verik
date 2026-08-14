@@ -207,7 +207,10 @@ export function buildVerifyCommand(): Command {
         process.exitCode = exit.exitCode;
       } catch (err) {
         console.error(`${block('✕')} ${formatError(err)}`);
-        process.exit(1);
+        // Same reason as the verdict path above: `process.exit()` while an
+        // HTTP handle is closing aborts the process on Windows and replaces
+        // this code with 127.
+        process.exitCode = 1;
       }
     });
 }

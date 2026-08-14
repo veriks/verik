@@ -23,22 +23,61 @@ interface CheckResult {
   detail?: string;
 }
 
+/**
+ * A label per outcome, because one label cannot describe both.
+ *
+ * Every label used to be a single string asserting the healthy state, printed
+ * whatever the result was. So a machine with no `.verik` directory read
+ * `~ .verik/ directory exists — run verik init to create it`, which says the
+ * directory both does and does not exist, and a machine with no key read
+ * `✕ ANTHROPIC_API_KEY is set`. The symbol and the sentence contradicted each
+ * other on exactly the runs where a user most needs to trust the output.
+ */
+type Labels = string | { ok: string; warn?: string; fail?: string };
+
+const labelFor = (labels: Labels, status: CheckResult['status']): string => {
+  if (typeof labels === 'string') return labels;
+  if (status === 'ok') return labels.ok;
+  return (status === 'warn' ? labels.warn : labels.fail) ?? labels.ok;
+};
+
 async function check(
-  label: string,
+  labels: Labels,
   fn: () => Promise<'ok' | 'warn' | { fail: string } | { warn: string }>,
 ): Promise<CheckResult> {
+  const done = (status: CheckResult['status'], detail?: string): CheckResult => ({
+    label: labelFor(labels, status),
+    status,
+    ...(detail === undefined ? {} : { detail }),
+  });
   try {
     const result = await fn();
-    if (result === 'ok') return { label, status: 'ok' };
-    if (result === 'warn') return { label, status: 'warn' };
-    if (typeof result === 'object' && 'fail' in result)
-      return { label, status: 'fail', detail: result.fail };
-    if (typeof result === 'object' && 'warn' in result)
-      return { label, status: 'warn', detail: result.warn };
-    return { label, status: 'ok' };
+    if (result === 'ok') return done('ok');
+    if (result === 'warn') return done('warn');
+    if (typeof result === 'object' && 'fail' in result) return done('fail', result.fail);
+    if (typeof result === 'object' && 'warn' in result) return done('warn', result.warn);
+    return done('ok');
   } catch (e) {
-    return { label, status: 'fail', detail: String(e) };
+    return done('fail', String(e));
   }
+}
+
+/**
+ * Which provider to diagnose when no config file has been written yet.
+ *
+ * Falling straight back to Anthropic meant a fresh checkout by someone holding
+ * an OpenAI key was told `ANTHROPIC_API_KEY` was missing — true, and useless.
+ * The key that is actually present is far better evidence of intent than the
+ * first entry in an enum.
+ */
+function detectProviderFromEnv(): ProviderId | undefined {
+  for (const id of Object.keys(PROVIDERS) as ProviderId[]) {
+    const spec = PROVIDERS[id];
+    // Local runtimes accept any key, so their env var proves nothing.
+    if (spec.keyOptional) continue;
+    if (process.env[spec.apiKeyEnv]) return id;
+  }
+  return undefined;
 }
 
 export function buildDoctorCommand(): Command {
@@ -53,7 +92,8 @@ export function buildDoctorCommand(): Command {
       } catch {
         if (!options.json) console.error(err('Not a git repository — verik requires git.'));
         else console.log(JSON.stringify({ ok: false, error: 'not-a-git-repo' }));
-        process.exit(1);
+        process.exitCode = 1;
+        return;
       }
 
       const results: CheckResult[] = [];
@@ -61,40 +101,63 @@ export function buildDoctorCommand(): Command {
       // 1. Git repo
       results.push(await check('Git repository detected', async () => 'ok'));
 
+      const exists = (...parts: string[]) =>
+        access(join(repoRoot, ...parts)).then(
+          () => true,
+          () => false,
+        );
+      const hasVerikDir = await exists('.verik');
+      const hasConfigFile = await exists('.verik', 'config.json');
+      const hasPolicyFile = await exists('.verik', 'policy.json');
+
       // 2. .verik directory
       results.push(
-        await check('.verik/ directory exists', async () => {
-          try {
-            await access(join(repoRoot, '.verik'));
-            return 'ok';
-          } catch {
-            return { warn: 'run `verik init` to create it' };
-          }
-        }),
+        await check(
+          { ok: '.verik/ directory present', warn: '.verik/ not initialised' },
+          async () =>
+            hasVerikDir
+              ? 'ok'
+              : {
+                  warn:
+                    'run `verik init` to configure providers and policy; ' +
+                    'deterministic rules run without it',
+                },
+        ),
       );
 
-      // 3. Config parses
+      // 3 and 4. Config and policy parse.
+      //
+      // `loadConfig` and `loadPolicy` fall back to built-in defaults when the
+      // files are absent, so both used to report `✓ config.json is valid` in a
+      // repository that had no config.json — naming a file that is not there
+      // and calling it valid. The check is still worth running (the defaults
+      // must load), but the label has to say which of the two it read.
       results.push(
-        await check('config.json is valid', async () => {
-          try {
-            await loadConfig(repoRoot);
-            return 'ok';
-          } catch (e) {
-            return { fail: String(e) };
-          }
-        }),
+        await check(
+          hasConfigFile ? 'config.json is valid' : 'Configuration valid (built-in defaults)',
+          async () => {
+            try {
+              await loadConfig(repoRoot);
+              return 'ok';
+            } catch (e) {
+              return { fail: String(e) };
+            }
+          },
+        ),
       );
 
-      // 4. Policy parses
       results.push(
-        await check('policy.json is valid', async () => {
-          try {
-            await loadPolicy(repoRoot);
-            return 'ok';
-          } catch (e) {
-            return { fail: String(e) };
-          }
-        }),
+        await check(
+          hasPolicyFile ? 'policy.json is valid' : 'Policy valid (built-in defaults)',
+          async () => {
+            try {
+              await loadPolicy(repoRoot);
+              return 'ok';
+            } catch (e) {
+              return { fail: String(e) };
+            }
+          },
+        ),
       );
 
       // 5. API key present.
@@ -103,21 +166,40 @@ export function buildDoctorCommand(): Command {
       // read ANTHROPIC_API_KEY unconditionally, so doctor told anyone on
       // OpenAI, Gemini or a local runtime that their key was missing when it
       // was not — from the one command whose job is diagnosing exactly that.
-      const providerId = await loadConfig(repoRoot)
-        .then((c) => c.provider)
-        .catch(() => 'anthropic' as const);
+      const configuredProvider = hasConfigFile
+        ? await loadConfig(repoRoot)
+            .then((c) => c.provider)
+            .catch(() => undefined)
+        : undefined;
+      // Configured wins; otherwise believe whichever key is actually exported.
+      const providerId = configuredProvider ?? detectProviderFromEnv() ?? 'anthropic';
       // `provider` is enum-validated on load, so the spec always exists — no
       // fallback, and therefore no place for an Anthropic assumption to hide.
       const spec: ProviderSpec = PROVIDERS[providerId as ProviderId];
       const keyVar = spec.apiKeyEnv;
       const apiKey = resolveApiKey(spec);
+      const source = configuredProvider
+        ? ''
+        : detectProviderFromEnv()
+          ? ' (detected from environment)'
+          : ' (default)';
       results.push(
-        await check(`${keyVar} is set`, async () => {
-          if (apiKey || spec.keyOptional) return 'ok';
-          return {
-            fail: `Set ${keyVar} to enable AI verification stages (provider: ${providerId})`,
-          };
-        }),
+        await check(
+          {
+            ok: `${keyVar} is set (provider: ${spec.label}${source})`,
+            warn: `${keyVar} is not set (provider: ${spec.label}${source})`,
+          },
+          async () => {
+            if (apiKey || spec.keyOptional) return 'ok';
+            // Not a failure. Deterministic rules are the whole product without
+            // a key, and `verik verify --mode rules` is the documented offline
+            // path — so exiting 1 here told every new user their healthy
+            // install was broken before they had run anything.
+            return {
+              warn: 'the AI stages are skipped without it; `verik verify --mode rules` needs no key',
+            };
+          },
+        ),
       );
 
       // 6 and 7. Key and models, asked of the provider actually configured.
@@ -131,27 +213,34 @@ export function buildDoctorCommand(): Command {
 
       if (apiKey && providerId === 'anthropic') {
         results.push(
-          await check('API key is accepted by Anthropic', async () => {
-            try {
-              const client = new Anthropic({ apiKey, maxRetries: 0 });
-              await client.messages.create({
-                model: 'claude-haiku-4-5',
-                max_tokens: 1,
-                messages: [{ role: 'user', content: 'ping' }],
-              });
-              return 'ok';
-            } catch (e) {
-              if (e instanceof Anthropic.AuthenticationError) {
-                return {
-                  fail: 'API key is invalid or expired — generate a new key at console.anthropic.com',
-                };
+          await check(
+            {
+              ok: 'API key is accepted by Anthropic',
+              fail: 'API key is rejected by Anthropic',
+              warn: 'Could not reach the Anthropic API',
+            },
+            async () => {
+              try {
+                const client = new Anthropic({ apiKey, maxRetries: 0 });
+                await client.messages.create({
+                  model: 'claude-haiku-4-5',
+                  max_tokens: 1,
+                  messages: [{ role: 'user', content: 'ping' }],
+                });
+                return 'ok';
+              } catch (e) {
+                if (e instanceof Anthropic.AuthenticationError) {
+                  return {
+                    fail: 'it is invalid or expired — generate a new key at console.anthropic.com',
+                  };
+                }
+                if (e instanceof Anthropic.PermissionDeniedError) {
+                  return { fail: 'it does not have permission to use this model' };
+                }
+                return { warn: String(e) };
               }
-              if (e instanceof Anthropic.PermissionDeniedError) {
-                return { fail: 'API key does not have permission to use this model' };
-              }
-              return { warn: `Could not reach Anthropic API: ${String(e)}` };
-            }
-          }),
+            },
+          ),
         );
       } else if (apiKey && spec.baseUrl) {
         // Every other provider speaks OpenAI-compatible HTTP, where GET /models
@@ -161,22 +250,29 @@ export function buildDoctorCommand(): Command {
         const available: string[] = [];
 
         results.push(
-          await check(`API key is accepted by ${spec.label}`, async () => {
-            try {
-              const res = await fetch(`${base}/models`, {
-                headers: { Authorization: `Bearer ${apiKey}` },
-              });
-              if (res.status === 401 || res.status === 403) {
-                return { fail: `API key rejected — generate a new one at ${spec.docs}` };
+          await check(
+            {
+              ok: `API key is accepted by ${spec.label}`,
+              fail: `API key is rejected by ${spec.label}`,
+              warn: `Could not reach ${spec.label}`,
+            },
+            async () => {
+              try {
+                const res = await fetch(`${base}/models`, {
+                  headers: { Authorization: `Bearer ${apiKey}` },
+                });
+                if (res.status === 401 || res.status === 403) {
+                  return { fail: `generate a new one at ${spec.docs}` };
+                }
+                if (!res.ok) return { warn: `it returned HTTP ${res.status}` };
+                const body = (await res.json()) as { data?: Array<{ id?: string }> };
+                available.push(...(body.data ?? []).map((m) => m.id ?? '').filter(Boolean));
+                return 'ok';
+              } catch (e) {
+                return { warn: String(e) };
               }
-              if (!res.ok) return { warn: `${spec.label} returned HTTP ${res.status}` };
-              const body = (await res.json()) as { data?: Array<{ id?: string }> };
-              available.push(...(body.data ?? []).map((m) => m.id ?? '').filter(Boolean));
-              return 'ok';
-            } catch (e) {
-              return { warn: `Could not reach ${spec.label}: ${String(e)}` };
-            }
-          }),
+            },
+          ),
         );
 
         // Absence is a warning, not a failure: plenty of gateways serve models
@@ -189,12 +285,17 @@ export function buildDoctorCommand(): Command {
             ['judge', cfg.models.judge],
           ] as [string, string][]) {
             results.push(
-              await check(`Model for ${stage} (${model}) is listed`, async () =>
-                listed.includes(model)
-                  ? 'ok'
-                  : {
-                      warn: `"${model}" is not in ${spec.label}'s model list — it may still work, or set VERIK_MODEL_${stage.toUpperCase()}`,
-                    },
+              await check(
+                {
+                  ok: `Model for ${stage} (${model}) is listed`,
+                  warn: `Model for ${stage} (${model}) is not listed`,
+                },
+                async () =>
+                  listed.includes(model)
+                    ? 'ok'
+                    : {
+                        warn: `it may still work; override with VERIK_MODEL_${stage.toUpperCase()}`,
+                      },
               ),
             );
           }
@@ -235,7 +336,8 @@ export function buildDoctorCommand(): Command {
             2,
           ),
         );
-        process.exit(failed.length > 0 ? 1 : 0);
+        process.exitCode = failed.length > 0 ? 1 : 0;
+        return;
       }
 
       console.log('');
@@ -250,7 +352,10 @@ export function buildDoctorCommand(): Command {
         console.log(pass('Everything looks good.'));
       } else if (failed.length > 0) {
         console.log(block(`${failed.length} check(s) failed.`));
-        process.exit(1);
+        // doctor reaches the provider over HTTP, so this cannot be
+        // process.exit() — forcing exit while the handle is closing trips a
+        // libuv assertion on Windows and returns 127 instead of 1.
+        process.exitCode = 1;
       } else {
         console.log(warn(`${warned.length} warning(s).`));
       }
