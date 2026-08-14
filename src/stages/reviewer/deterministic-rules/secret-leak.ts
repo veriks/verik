@@ -1,4 +1,5 @@
 import type { DeterministicRule, DeterministicFinding, RuleContext } from './index.js';
+import { isTestPath } from './file-kinds.js';
 import { iterateAddedLines, looksLikePlaceholder } from './patch-lines.js';
 
 /**
@@ -16,12 +17,28 @@ const SECRET_PATTERNS = [
     label: 'credential',
     /** The quoted value, for the placeholder check. */
     valueGroup: 1,
+    /**
+     * Shape only — a name that sounds credential-ish next to any string. That
+     * is exactly what a test fixture looks like, so this one does not run in
+     * test files. hono reported five CRITICAL findings on
+     * `jwt({ secret: 'a-secret' })` and a response field literally named
+     * `secret`, and CRITICAL blocks a commit.
+     */
+    inTests: false,
   },
-  { re: /((?:sk-|pk-|ghp_|gho_|ghu_|ghs_)[a-zA-Z0-9_-]{10,})/, label: 'API key', valueGroup: 1 },
+  {
+    // A real provider key announces itself. Worth flagging anywhere, including
+    // tests, because this shape is not something a fixture invents by accident.
+    re: /((?:sk-|pk-|ghp_|gho_|ghu_|ghs_)[a-zA-Z0-9_-]{10,})/,
+    label: 'API key',
+    valueGroup: 1,
+    inTests: true,
+  },
   {
     re: /-----BEGIN (?:RSA |EC |OPENSSH |PGP )?PRIVATE KEY-----/,
     label: 'private key',
     valueGroup: 0,
+    inTests: true,
   },
 ] as const;
 
@@ -34,7 +51,9 @@ export const SecretLeakRule: DeterministicRule = {
     const findings: DeterministicFinding[] = [];
 
     for (const added of iterateAddedLines(ctx.patch)) {
-      for (const { re, label, valueGroup } of SECRET_PATTERNS) {
+      const inTest = isTestPath(added.path);
+      for (const { re, label, valueGroup, inTests } of SECRET_PATTERNS) {
+        if (inTest && !inTests) continue;
         const match = re.exec(added.text);
         if (!match) continue;
 

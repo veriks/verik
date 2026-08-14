@@ -106,6 +106,23 @@ describe('SecretLeakRule', () => {
     expect(await SecretLeakRule.run(ctx(patch))).toHaveLength(0);
   });
 
+  it('does not flag a credential-shaped test fixture', async () => {
+    // hono reported five CRITICAL findings on lines like these, and CRITICAL
+    // blocks a commit. A JWT test needs a signing key; the shape heuristic
+    // cannot tell one from a leak, so it does not run in test files.
+    const patch = hunk('src/middleware/jwt/index.test.ts', 1, [
+      "+  app.use('/auth/*', jwt({ secret: 'a-secret', alg: 'HS256' }))",
+      "+  c.json({ secret: 'private user data' })",
+    ]);
+    expect(await SecretLeakRule.run(ctx(patch))).toHaveLength(0);
+  });
+
+  it('still flags a real provider key inside a test file', async () => {
+    // A key with a provider prefix is not something a fixture invents.
+    const patch = hunk('src/a.test.ts', 1, ['+const k = "sk-live-aaaaaaaaaaaaaaaaaaaa";']);
+    expect(await SecretLeakRule.run(ctx(patch))).toHaveLength(1);
+  });
+
   it('still catches a real credential assignment', async () => {
     const patch = hunk('a.ts', 1, ['+const password = "hunter2-J8x!vQ2z";']);
     expect(await SecretLeakRule.run(ctx(patch))).toHaveLength(1);

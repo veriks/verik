@@ -70,6 +70,19 @@ export function isSourcePath(path: string): boolean {
   return path.length > 0 && !isVendoredPath(path) && !isDocPath(path);
 }
 
+/**
+ * Code that supports the project rather than shipping in it: scripts, tools,
+ * examples, benchmarks.
+ *
+ * Printing to stdout is the entire point of a benchmark, and cross-library
+ * shims are why it reaches for `any`. hono's benchmarks/ produced most of its
+ * debug-artifact and type-escape findings, which are true statements about
+ * files nobody ships.
+ */
+export function isSupportCodePath(path: string): boolean {
+  return /(^|\/)(scripts?|tools?|bin|examples?|cmd|bench(?:marks?)?|perf)(\/|$)/.test(path);
+}
+
 /** Hand-written source excluding tests — the scope for most hygiene rules. */
 export function isProductionSourcePath(path: string): boolean {
   return isSourcePath(path) && !isTestPath(path);

@@ -1,5 +1,5 @@
 import { defineLineRule } from './line-rule.js';
-import { isProductionSourcePath } from './file-kinds.js';
+import { isProductionSourcePath, isSupportCodePath } from './file-kinds.js';
 
 /**
  * These rules all describe shipped-code hygiene, so none of them read test
@@ -52,7 +52,16 @@ export const SuppressionAddedRule = defineLineRule({
   ],
   // A suppression pragma is always a comment, so comment-skipping cannot apply.
   skipComments: false,
-  appliesTo: PRODUCTION_ONLY,
+  // Linter configuration is where suppression policy is *declared*, and those
+  // files quote the directives they match on — cobra's .golangci.yml contains
+  // `text: 'directive //nolint:staticcheck is unused'`, which is a rule about a
+  // suppression rather than one. Changing lint policy is a different act from
+  // silencing a line.
+  appliesTo: (p) =>
+    PRODUCTION_ONLY(p) &&
+    !/(^|\/)(\.golangci\.ya?ml|\.eslintrc[^/]*|eslint\.config\.[cm]?[jt]s|ruff\.toml|setup\.cfg|tox\.ini|\.flake8|pyproject\.toml|\.pylintrc)$/.test(
+      p,
+    ),
   message:
     'A static-analysis suppression was added. A checker reported a problem on this line and the ' +
     'suppression hides it rather than resolving it.',
@@ -148,9 +157,8 @@ export const DebugArtifactRule = defineLineRule({
   ],
   message: 'A debug statement was left in non-test source.',
   remediation: 'Remove it, or route the output through the project logger.',
-  // Also skips scripts and examples, where printing to stdout is the point.
-  appliesTo: (p) =>
-    PRODUCTION_ONLY(p) && !/(^|\/)(scripts?|tools?|bin|examples?|cmd)(\/|$)/.test(p),
+  // Also skips scripts, examples and benchmarks, where printing is the point.
+  appliesTo: (p) => PRODUCTION_ONLY(p) && !isSupportCodePath(p),
   maxFindings: 8,
 });
 
@@ -174,7 +182,8 @@ export const TypeEscapeRule = defineLineRule({
   ],
   message: 'A type assertion or `any` was introduced, removing compiler checking at this point.',
   remediation: 'Narrow the type properly, or document why the assertion is sound.',
-  // `as any` in a test double is ordinary; in shipped code it is a gap.
-  appliesTo: PRODUCTION_ONLY,
+  // `as any` in a test double or a benchmark shim is ordinary; in shipped code
+  // it is a gap.
+  appliesTo: (p) => PRODUCTION_ONLY(p) && !isSupportCodePath(p),
   maxFindings: 8,
 });
