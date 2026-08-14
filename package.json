@@ -7,7 +7,7 @@
     "node": ">=20"
   },
   "bin": {
-    "verik": "./dist/index.js"
+    "verik": "dist/index.js"
   },
   "files": [
     "dist",
@@ -87,7 +87,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/veriks/verik"
+    "url": "git+https://github.com/veriks/verik.git"
   },
   "packageManager": "pnpm@9.12.0"
 }
