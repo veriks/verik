@@ -2,8 +2,10 @@
 
 Everything between "it works on my machine" and "a stranger uses it."
 
-Verik has only ever run on Windows. That is the single biggest unknown in the
-project, and the first section exists because of it.
+Platform coverage is no longer the open question. CI is green on ubuntu, macOS
+and Windows, and two people have run Verik on their own machines — Windows and
+macOS, real repositories, a real provider key. What remains untested is the
+release pipeline itself.
 
 ---
 
@@ -33,11 +35,16 @@ something else.
 ## 2. Platform testing
 
 CI covers `ubuntu-latest`, `windows-latest`, `macos-latest` on Node 20, plus
-Ubuntu on Node 22. **It has never run.** Making the repo visible and pushing is
-the fastest way to learn more than any local testing will tell you.
+Ubuntu on Node 22, and **all four are green**.
 
-These are the places where the code is genuinely platform-dependent, in rough
-order of how badly they fail if wrong.
+Its first run earned its keep immediately: macOS and Windows both failed the same
+two assertions, because temp directories are reached through an indirection on
+each — macOS resolves `/var/folders` to `/private/var/folders`, Windows returns
+the 8.3 short name `RUNNER~1`. Git reports the resolved path, so comparing it
+against a constructed one passed on Linux alone.
+
+The list below is kept as the manual pass for anything CI cannot reach, and as a
+record of where this code is genuinely platform-dependent.
 
 ### The attribution engine — `core/repository/worktree-tree.ts`
 
