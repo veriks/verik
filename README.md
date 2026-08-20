@@ -1,6 +1,9 @@
 <p align="center">
   <img src="assets/logo.png" alt="Verik" width="320">
 </p>
+<p align="center">
+  <strong>by Runi</strong><br>
+</p>
 
 <p align="center">
   <strong>Your agent says it's done. Verik tells you what it actually did.</strong><br>
@@ -15,7 +18,7 @@
 
 ## What is Verik?
 
-Verik is an open-source CLI that checks what your AI coding agent actually
+Verik is an open-source CLI made by Runi that checks what your AI coding agent actually
 changed. It separates the agent's edits from your own uncommitted work, runs
 your project's build and tests, applies 23 deterministic checks, and returns an
 exit code CI can act on.
